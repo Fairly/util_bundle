@@ -1,63 +1,43 @@
 #!/usr/bin/env python3
-import shutil
-
 import numpy as np
-
-from util_bundle.measurement import ap_recognition, get_range
 
 
 # File handling
 
 def read_data_file(filename):
-    npa_data = np.genfromtxt(filename, delimiter="\t", dtype='f8', names=True)
     with open(filename, 'r') as f_in:
-        header = f_in.readline().strip()
-        l_labels = header.split('\t')
-    return l_labels, npa_data
+        first_line = f_in.readline().strip()
+        first_field = first_line.split('\t')[0]
+
+        try:  # no header
+            float(first_field)
+            npa_data = np.genfromtxt(filename, delimiter="\t", dtype='f8')
+            l_labels = None
+        except ValueError:  # with header
+            npa_data = np.genfromtxt(filename, delimiter="\t", dtype='f8', names=True)
+
+            f_in.seek(0)
+            header = f_in.readline().strip()
+            l_labels = header.split('\t')
+            l_labels = [_label.strip() for _label in l_labels]
+
+            # The number of data fields may exceed the number of headers, remove the last column
+            if len(l_labels) < len(npa_data[0]):
+                names = list(npa_data.dtype.names)[:len(l_labels)]
+                npa_data = npa_data[names]
+
+        return l_labels, npa_data
 
 
 def save_data_file(filename, header, data):
     """
     This function is symmetric with read_data_file().
     """
-    header_ = '\t'.join(header)
-    np.savetxt(filename, data, fmt='%f', delimiter='\t',
-               comments='', newline='\n', header=header_)
-
-
-def clean_result_for_plot(filename, add_underline=True, truncate_to=None,
-                          reset_start_time=True, tail=True):  # TODO parameter `tail`
-    """
-    When plotting a result, it's common to reduce the size of the result file first.
-
-    :param filename:
-    :param add_underline: whether add a '_' mark to every field in header names
-    :param reset_start_time: if the start time is not 0, whether to reset it to 0
-    :param truncate_to: whether truncate the result file to a single beat (the final beat)
-    :return:
-    """
-    backup = 'backup.dat'
-
-    shutil.copyfile(filename, backup)
-
-    headers, data = read_data_file(backup)
-
-    if add_underline and not headers[0].endswith('_'):
-        for i, tag in enumerate(headers):
-            headers[i] = tag + '_'
-
-    if truncate_to is not None:
-        dt, beats = ap_recognition(data)
-        start, _ = get_range(len(beats) - truncate_to, dt, beats)
-        _, end = get_range(len(beats) - 1, dt, beats)
-        data = data[start:end+1]
-
-    if reset_start_time:
-        time_offset = data[0][0] - (data[1][0] - data[0][0])  # time of 1st row minus dt
-        for row in data:
-            row[0] = row[0] - time_offset
-
-    save_data_file(filename, headers, data)
+    if header is not None:
+        header_ = '\t'.join(header)
+        np.savetxt(filename, data, fmt='%f', delimiter='\t', comments='', newline='\n', header=header_)
+    else:
+        np.savetxt(filename, data, fmt='%f', delimiter='\t', comments='', newline='\n')
 
 
 # Plot utils

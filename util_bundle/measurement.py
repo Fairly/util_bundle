@@ -25,6 +25,7 @@ def ap_recognition(data, time_prefix='t', stim_prefix='I_Stim'):
     Raise:
         DataError
     """
+    # TODO Only support non-pacemaking cells
     time_name = ''
     stim_name = ''
     for header in data.dtype.names:
