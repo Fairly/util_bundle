@@ -126,13 +126,13 @@ def autoplot(l_input_filename, l_label, flags=('all',), xlimit=None, outfigname=
     :param l_input_filename:
     :param l_label:
     :param flags:
-    :param xlimit:
+    :param xlimit: None, tuple or a tuple of two list
     :param outfigname: If no fig name is given, no fig will be saved.
     """
     data = gen_data(l_input_filename, l_label)
 
     # translation data to align them
-    if isinstance(xlimit[0], list):
+    if xlimit is not None and isinstance(xlimit[0], list):
         start, end = xlimit
         new_end = []
         for s, e, d in zip(start, end, data):
