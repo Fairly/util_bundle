@@ -96,6 +96,7 @@ def my_plot(data, l_labels, xlimit=None):
     num_of_axes = len(l_labels)
     r, c = get_axes_num(num_of_axes)
 
+    legend_flag = False
     for i, column_label in enumerate(l_labels):
         if column_label == data[0]['xaxis']:
             continue
@@ -113,7 +114,9 @@ def my_plot(data, l_labels, xlimit=None):
         axe.set_title(column_label)
         if xlimit is not None:
             axe.set_xlim(*xlimit)
-        axe.legend(prop={'size': 10})
+        if not legend_flag:
+            axe.legend(prop={'size': 10})
+            legend_flag = True
 
 
 def autoplot(l_input_filename, l_label, flags=('all',), xlimit=None, outfigname=None):
@@ -127,6 +130,16 @@ def autoplot(l_input_filename, l_label, flags=('all',), xlimit=None, outfigname=
     :param outfigname: If no fig name is given, no fig will be saved.
     """
     data = gen_data(l_input_filename, l_label)
+
+    # translation data to align them
+    if isinstance(xlimit[0], list):
+        start, end = xlimit
+        new_end = []
+        for s, e, d in zip(start, end, data):
+            d['data'][d['xaxis']] = d['data'][d['xaxis']] - s  # translation the 'xaxis' column of d['data']
+            new_end.append(e-s)
+        max_end = max(new_end)
+        xlimit = (0, max_end)
 
     if 'all' in flags:
         if len(data[0]['l_labels']) < 10:

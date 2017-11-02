@@ -145,48 +145,61 @@ class quickplot(AbstractCommand):
     """
 An quick interface for plotting and comparing APs or currents.
 
-usage: quickplot [-VI] [-o=OUT] [(-x <XSTART> <XEND>)] (<FILE> <LABEL>)...
+usage: quickplot [-VIA] [-o=OUT] [(-x <XSTART> <XEND>)] (<FILE> <LABEL>)...
+       quickplot [-VIA] [-o=OUT] -s (<FSTART> <FEND> <FILE> <LABEL>)...
 
 Options:
-    -o=OUT      The file name of the output figure.
-                If not given, show the figure but not save it.
     -V          Trigger for whether plotting the AP.
     -I          Trigger for whether plotting currents.
+    -A          Trigger for whether plotting all fields.
+    -o=OUT      The file name of the output figure.
+                If not given, show the figure but not save it.
     -x          Whether set limits on the x axis.
+    -s          Separately set x-limits of all FILEs.
 
 Arguments:
     FILE LABEL
                 One Label for one file.
     XSTART XEND
-                The starting and ending points of x limits.
+                The starting and ending points of x-limits.
+    FSTART FEND
+                The starting and ending points of x-limits of each FILE.
     """
 
     def execute(self):
-        schema = Schema({'-I': bool,
-                         '-V': bool,
-                         '-o': Or(None, And(str, len)),
-                         '-x': bool,
-                         '<FILE>': list,
-                         '<LABEL>': list,
-                         '<XEND>': Or(None, float),
-                         '<XSTART>': Or(None, float),
-                         }
-                        )
+        schema = Schema({
+            '-I': bool,
+            '-V': bool,
+            '-A': bool,
+            '-o': Or(None, And(str, len)),
+            '-x': bool,
+            '-s': bool,
+            '<FILE>': [str],
+            '<LABEL>': [str],
+            '<XEND>': Or(None, Use(float)),
+            '<XSTART>': Or(None, Use(float)),
+            '<FEND>': Or(None, [Use(float)]),
+            '<FSTART>': Or(None, [Use(float)]),
+        })
 
         args = schema.validate(self.args)
 
-        # print(args)
         plotflag = []
-        if args['-V']:
-            plotflag.append('V')
-        if args['-I']:
-            plotflag.append('I')
+        if args['-A']:
+            plotflag.append('all')
+        else:
+            if args['-V']:
+                plotflag.append('V')
+            if args['-I']:
+                plotflag.append('I')
 
         if not plotflag:  # default: plot voltage
             plotflag.append('V')
 
         if args['-x']:
             xlim = (args['<XSTART>'], args['<XEND>'])
+        elif args['-s']:
+            xlim = (args['<FSTART>'], args['<FEND>'])
         else:
             xlim = None
 
