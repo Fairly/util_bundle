@@ -122,6 +122,70 @@ if __name__ == "__main__":
     # plt.show()
 
     # clean_result_for_plot(
-    #     "/Users/fairly/Documents/workspace_cpp/weijian_origin/cmake-build-debug/bin/output/20170504-175200/result.dat",
+    #     "/Users/fairly/Documents/workspace_cpp/weijian_origin/cmake-build-debug/bin/output/20170504-175200/result
+    # .dat",
     #     truncate_to=2)
     pass
+
+
+def write_scalar_vtk(volume, ratio_ztox, filename='3D_reconstruction', ifbinary=False):
+    z, y, x = volume.shape
+
+    filename += '.vtk'
+
+    # a mapping from np.dtype to types that vtk supports
+    m_vtk_dtype = {
+        np.bool_: 'bit',
+        np.uint8: 'unsigned_char',
+        np.uint16: 'unsigned_short',
+        np.float64: 'double',
+    }
+    vtk_dtype = m_vtk_dtype[volume.dtype.type]
+
+    if ifbinary:
+        with open(filename, 'w') as fid:
+            # Write a header defined by vtk
+            print('# vtk DataFile Version 3.0', file=fid)
+            print('vtk output', file=fid)
+            print('BINARY', file=fid)
+            print('DATASET STRUCTURED_POINTS', file=fid)
+            print('DIMENSIONS %d %d %d' % (x, y, z), file=fid)
+            print('SPACING 1 1 %.1f' % ratio_ztox, file=fid)
+            print('ORIGIN 0 0 0', file=fid)
+            print('POINT_DATA  %d' % (x * y * z), file=fid)
+            print('SCALARS ImageFile %s' % vtk_dtype, file=fid)
+            print('LOOKUP_TABLE default', file=fid)
+            print(file=fid)
+
+        with open(filename, 'ab') as fid:
+            if volume.dtype.type == np.bool_:
+                volume = np.packbits(volume)
+
+            # Write bytes of the volume
+            # When the volume is too big, directly write will fail, break it down.
+            fid.write(volume[0:int(np.math.floor(z / 2)), :, :].tobytes())
+            fid.write(volume[int(np.math.floor(z / 2)):, :, :].tobytes())
+    else:
+        # Write ASCIIs of the volume
+        with open(filename, 'w') as fid:
+            # Write a header defined by vtk
+            print('# vtk DataFile Version 3.0', file=fid)
+            print('vtk output', file=fid)
+            print('ASCII', file=fid)
+            print('DATASET STRUCTURED_POINTS', file=fid)
+            print('DIMENSIONS %d %d %d' % (x, y, z), file=fid)
+            print('SPACING 1 1 %.1f' % ratio_ztox, file=fid)
+            print('ORIGIN 0 0 0', file=fid)
+            print('POINT_DATA  %d' % (x * y * z), file=fid)
+
+            print('SCALARS ImageFile %s' % vtk_dtype, file=fid)
+            print('LOOKUP_TABLE default', file=fid)
+            print(file=fid)
+
+            # write data
+            if volume.dtype.type == np.bool_:
+                print(*(np.reshape(volume.astype(np.uint8), x * y * z).tolist()), file=fid)
+            else:
+                print(*(np.reshape(volume, x * y * z).tolist()), file=fid)
+
+    print(filename + ' SCALAR volume writing done!')

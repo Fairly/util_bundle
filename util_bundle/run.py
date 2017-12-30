@@ -2,22 +2,29 @@
 """
 Usage:
     run.py <command> [<args>...]
+    run.py -h
 
 Control the running of the cell model. Do simulations automatically.
 
-command:
+Command:
   run           Do experiments according to different BCLs.
   freq          Do experiments according to different frequencies.
   s1s2          Do simulation using s1s2 protocols.
   burst         Do simulation using the burst pacing protocol.
 
-  cleanresult   Clean a result file for plotting.
+  clean         Clean a result file for plotting.
   measure       Calculate characteristics of APs from results of cell models.
-  quickplot     Plot AP or current traces by a simple script.
+  qplot         Plot AP or current traces by a simple script.
   plot          Plot figures.
 
+  con3d        Do 3D geometry construction.
+  prep         Pre-process original images.
+
+Options:
+  -h, --help    Print the help message.
+
 Arguments:
-  <args>        Arguments for sub-commands.
+  <args>        Arguments for commands.
 """
 
 from __future__ import division, print_function
@@ -32,6 +39,7 @@ def main():
     args = docopt(__doc__, options_first=True)
 
     schema = Schema({
+        '--help': bool,
         '<command>': str,
         '<args>': list,
     }
@@ -68,8 +76,3 @@ def main():
 
 if __name__ == '__main__':
     main()
-    # import pandas as pd
-    # a = pd.read_csv('IKssBlock.dat', sep='\t')
-    # a.to_csv('aaa', sep='\t', index=False)
-    # a.set_index('Unnamed: 0')
-    # print(a[0:1])

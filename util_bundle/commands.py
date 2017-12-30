@@ -4,15 +4,27 @@ from concurrent.futures import ThreadPoolExecutor
 from multiprocessing import cpu_count
 from subprocess import call
 
-import numpy as np
 from docopt import docopt
 from schema import Schema, Or, Use, And
+import numpy as np
+import scipy
+import scipy.ndimage
+import time
+# from scipy.misc import imread, imsave, imresize
+# from skimage.exposure import rescale_intensity
+from skimage.transform import rescale
+from skimage.io import imread, imsave
+import skimage
+import skimage.filters
+import skimage.draw
+import cv2
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
 
-from util import read_data_file, save_data_file, bar_arrange
+from util import read_data_file, save_data_file, bar_arrange, write_scalar_vtk
 from util_bundle.measurement import ap_recognition, get_range
+import mpl_setting
 import measurement
 import plot as myplot
 
@@ -38,20 +50,19 @@ class AbstractCommand:
 
 class measure(AbstractCommand):
     """
-usage:  measure    [-m] (-d <DIR> | <FILE>...)
+usage:  measure    [-m] (-d=DIR | <FILE>...)
 
 Options:
     -m          Open multi-processing.
-    -d <DIR>    Process all files written by cell models under DIR.
+    -d=DIR      Process all files written by cell models under DIR.
 Arguments:
     <FILE>...   Files to be processed.
     """
 
     def execute(self):
         schema = Schema({
-            '-d': bool,
+            '-d': Or(None, os.path.isdir),
             '-m': bool,
-            '<DIR>': Or(None, os.path.exists),
             '<FILE>': Or(None, [os.path.isfile], error='Cannot find file[s].'),
         }
         )
@@ -61,9 +72,9 @@ Arguments:
         p = ThreadPoolExecutor(cpu_count()) if args['-m'] else ThreadPoolExecutor(1)
         if args['-d']:
             # given a directory, measure all files in it
-            onlyfiles = [os.path.join(args['<DIR>'], f)
-                         for f in os.listdir(args['<DIR>'])
-                         if os.path.isfile(os.path.join(args['<DIR>'], f))]
+            onlyfiles = [os.path.join(args['-d'], f)
+                         for f in os.listdir(args['-d'])
+                         if os.path.isfile(os.path.join(args['-d'], f))]
             current_files = [f for f in onlyfiles if 'currents' in f]
 
             p.map(measurement.measure, current_files)
@@ -73,11 +84,11 @@ Arguments:
                 measurement.measure(f)
 
 
-class cleanresult(AbstractCommand):
+class clean(AbstractCommand):
     """
-usage: cleanresult [-ru] [-t num] <FILE>...
+usage: clean [-ru] [-t num] <FILE>...
 
-Original file will be backed up.
+Clean the data file. Original file will be backed up.
 
 Options:
     -r --reset-time
@@ -141,12 +152,12 @@ Arguments:
                                   reset_start_time=self.args['--reset-time'])
 
 
-class quickplot(AbstractCommand):
+class qplot(AbstractCommand):
     """
 An quick interface for plotting and comparing APs or currents.
 
-usage: quickplot [-VIA] [-o=OUT] [(-x <XSTART> <XEND>)] (<FILE> <LABEL>)...
-       quickplot [-VIA] [-o=OUT] -s (<FSTART> <FEND> <FILE> <LABEL>)...
+usage: qplot [-VIA] [-o=OUT] [(-x <XSTART> <XEND>)] (<FILE> <LABEL>)...
+       qplot [-VIA] [-o=OUT] -s (<FSTART> <FEND> <FILE> <LABEL>)...
 
 Options:
     -V          Trigger for whether plotting the AP.
@@ -158,10 +169,10 @@ Options:
     -s          Separately set x-limits of all FILEs.
 
 Arguments:
-    FILE LABEL
-                One Label for one file.
     XSTART XEND
                 The starting and ending points of x-limits.
+    FILE LABEL
+                One Label for one file.
     FSTART FEND
                 The starting and ending points of x-limits of each FILE.
     """
@@ -1041,3 +1052,324 @@ Arguments:
                 fig.savefig(os.path.join(outfolder, figname))
         else:
             plt.show()
+
+
+class con3d(AbstractCommand):
+    """
+usage:  con3d [options] <DIR>
+
+All images should have the same dimension.
+
+Options:
+  -b          Output binary vtk file, otherwise ASCII. Binary always faster.
+  -m=MAX      Max num of images to process.
+  -n=START    Set the starting number of image in the processing.
+  -s=suffix   The suffix of the filenames of input images. [default: .tif]
+  -o=fname    Output file name without suffix. If '-p' is provided, this fname
+              defined the output path. [default: 3D_reconstruction]
+  -t=dtype    Specify the underlying type of np.ndarray representing images.
+              Support '?'(bool), 'u1'(uint8), 'u2'(uint16), 'f8'(float64).
+              If not specified, output as input.
+  -r=ratio    Ratio of the resolution of z-axis and xy-axis. [default: 1.0]
+  -p          Change a perspective and save images.
+  -i          Change intensity of all points for auto-contrast change.
+
+Arguments:
+  <DIR>       The directory containing images.
+    """
+
+    def execute(self):
+        schema = Schema({
+            '-b': bool,
+            '-m': Or(None, Use(int)),
+            '-n': Or(None, Use(int)),
+            '-s': And(str, len),
+            '-o': And(str, len),
+            '-t': Or(None, Use(np.dtype)),
+            '-r': Use(float),
+            '-p': bool,
+            '-i': bool,
+            '<DIR>': Or(None, os.path.isdir),
+        })
+
+        args = schema.validate(self.args)
+
+        files = [os.path.join(args['<DIR>'], f)
+                 for f in os.listdir(args['<DIR>'])
+                 if os.path.isfile(os.path.join(args['<DIR>'], f))
+                 and f.endswith(args['-s'])]
+
+        if args['-m']:
+            num_of_figure = min(args['-m'], len(files))
+        else:
+            num_of_figure = len(files)
+
+        # Read one of the figures to get its dimensions
+        filename = files[0]
+        image_ori = imread(filename)
+
+        y, x = image_ori.shape  # Get the dimensions of figures
+
+        if args['-t'] is not None:
+            ndtype = np.dtype(args['-t'])
+        else:
+            ndtype = image_ori.dtype
+
+        # choose the right function to convert the data type in an image
+        map_ndtype2func = {
+            np.bool_: skimage.img_as_bool,
+            np.uint8: skimage.img_as_ubyte,
+            np.uint16: skimage.img_as_uint,
+            np.float64: skimage.img_as_float,
+        }
+        convert_func = map_ndtype2func[ndtype.type]
+
+        # initialise variables
+        volume = np.zeros((num_of_figure, y, x), dtype=ndtype)
+        if args['-n'] and args['-n']+num_of_figure <= len(files):
+            start = args['-n']
+        else:
+            start = 0
+
+        begin = time.clock()
+        # Iterate all figures to fill the 3D volume
+        for i in range(0, num_of_figure):
+            filename = files[start + i]
+
+            print('Reading image = %s' % filename)
+            image_ori = imread(filename)
+
+            image_ori = convert_func(image_ori)
+
+            volume[i, :, :] = image_ori
+
+        if args['-p']:
+            if not os.path.exists(args['-o']):
+                os.mkdir(args['-o'])
+
+            outputfiles = [os.path.join(args['-o'], str(i) + '.tif') for i in range(y)]
+
+            for i in range(y):
+                imsave(outputfiles[i], volume[:, i, :])
+
+            exit(0)
+
+        if args['-i']:
+            t = volume.dtype
+            volume = volume * (np.iinfo(volume.dtype).max / volume.max())
+            volume = volume.astype(t)
+
+        print()
+        print('Total image processing time: %f s.' % (time.clock() - begin))
+        print('Single image processing time: %f s.' % ((time.clock() - begin) / num_of_figure))
+        print()
+
+        begin = time.clock()
+        print('Constructing vtk file ...')
+        write_scalar_vtk(volume, args['-r'], args['-o'], ifbinary=args['-b'])
+        print('Total vtk output time: %f s.' % (time.clock() - begin))
+        print('Single slice output time: %f s.' % ((time.clock() - begin) / num_of_figure))
+
+
+class prep(AbstractCommand):
+    """
+usage:  prep [options] <PATH>
+
+Options:
+  -c             Crop void areas.
+  -d=rate        Do down-sampling. `rate` should be a float number.
+  -m=MAX         Max num of images to process.
+  -n=nth         Precess only the nth image.
+  -s=suffix      The suffix of the file names of input images. [default: .tif]
+  -o=dir_name    Output dir name. [default: down_sample]
+  -p             Plot intermediate images for debug purposes instead of saving result images.
+  -i             Whether improve the images. (only de-noise now)
+
+Arguments:
+  PATH           The directory containing images or a single image file.
+    """
+
+    def execute(self):
+        schema = Schema({
+            '-c': bool,
+            '-d': Or(None, Use(float)),
+            '-m': Or(None, Use(int)),
+            '-n': Or(None, Use(int)),
+            '-s': And(str, len),
+            '-o': And(str, len),
+            '-p': bool,
+            '-i': bool,
+            '<PATH>': Or(None, os.path.isdir, os.path.isfile),
+        })
+
+        args = schema.validate(self.args)
+
+        if os.path.isdir(args['<PATH>']):
+            files = [os.path.join(args['<PATH>'], f)
+                     for f in os.listdir(args['<PATH>'])
+                     if os.path.isfile(os.path.join(args['<PATH>'], f))
+                     and f.endswith(args['-s'])]
+        else:
+            files = [args['<PATH>']]
+
+        if not os.path.exists(args['-o']):
+            os.mkdir(args['-o'])
+
+        out_files = [os.path.join(args['-o'], os.path.basename(f))
+                     for f in files
+                     if os.path.isfile(f)
+                     and f.endswith(args['-s'])]
+
+        if args['-m'] is not None:
+            num_of_figure = min(args['-m'], len(files))
+        else:
+            num_of_figure = len(files)
+
+        if args['-n'] is not None:
+            files = files[args['-n']:args['-n'] + 1]
+            out_files = out_files[args['-n']:args['-n'] + 1]
+            num_of_figure = 1
+
+        begin = time.clock()
+
+        # Iterate all images
+        for i in range(0, num_of_figure):
+            filename = files[i]
+            out_file = out_files[i]
+
+            print('Reading image = %s' % filename)
+            image_ori = imread(filename)
+
+            if args['-i']:
+                # Cut a circle from the original image
+                rr, cc = skimage.draw.circle(999, 999, 800)
+                img = np.zeros(image_ori.shape).astype(image_ori.dtype)
+                img[rr, cc] = image_ori[rr, cc]
+
+                # Cartesian coordinate to polar
+                img = cv2.linearPolar(img, (img.shape[0] / 2, img.shape[1] / 2), 800, cv2.WARP_FILL_OUTLIERS)
+
+                # Mask construction
+                mask0 = img.copy()
+                mask0[mask0 < 100] = 0
+                mask0[mask0 >= 100] = 1
+                mask0.astype(np.bool)
+                # Do one iteration of erosion
+                bs = scipy.ndimage.generate_binary_structure(2, 1)
+                mask0 = scipy.ndimage.binary_erosion(mask0, structure=bs, iterations=6)
+                mask0 = scipy.ndimage.binary_dilation(mask0, structure=bs, iterations=6)
+
+                img[~mask0] = 0
+
+                # i2 = scipy.ndimage.filters.gaussian_filter(i0, 4)
+                # axe = fig.add_subplot(332)
+                # axe.imshow(i2)
+                #
+                # i3 = i0 - i2
+                # i3[~mask0] = 0
+                # axe = fig.add_subplot(333)
+                # axe.imshow(i3)
+                #
+                # i4 = np.fabs(i3.min()) + i3
+                # i4[~mask0] = 0
+                # axe = fig.add_subplot(334)
+                # axe.imshow(i4)
+
+                # Remove ring artifacts
+                i5 = scipy.ndimage.median_filter(img, size=(15, 9))
+                i5[~mask0] = 0
+
+                # Correction image
+                i6 = (img - i5)
+                i6[~mask0] = 0
+
+                # Corrected polar image
+                i9 = img - i6
+                i9[~mask0] = 0
+
+                # Polar coordinate to Cartesian
+                i9 = cv2.linearPolar(i9, (img.shape[0] / 2, img.shape[1] / 2), 800, cv2.WARP_INVERSE_MAP)
+
+                if args['-p']:
+                    mpl_setting.set_matplotlib_default()
+
+                    # original image
+                    plt.figure()
+                    plt.imshow(image_ori)
+
+                    # Show histogram of the image
+                    hist, bin_edges = np.histogram(img, bins=60)
+                    bin_centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
+                    plt.figure()
+                    plt.subplots_adjust(left=0.2)
+                    plt.bar(bin_centers[1:], hist[1:], width=5)
+                    plt.title('Histogram before')
+                    plt.xlabel('Greyscale bins')
+                    plt.ylabel('Number of pixels')
+
+                    axe = plt.gca()
+                    axe.spines['right'].set_visible(False)
+                    axe.spines['top'].set_visible(False)
+                    axe.yaxis.set_ticks_position('left')
+                    axe.xaxis.set_ticks_position('bottom')
+                    axe.tick_params(direction='out')
+                    # plt.savefig('hist_before.jpg')
+
+                    # intermediate images
+                    fig = plt.figure()
+                    fig.tight_layout()
+
+                    axe = fig.add_subplot(339)
+                    axe.imshow(mask0)
+                    axe = fig.add_subplot(331)
+                    axe.imshow(img)
+                    axe = fig.add_subplot(335)
+                    axe.imshow(i5)
+                    axe = fig.add_subplot(336)
+                    axe.imshow(i6)
+                    axe = fig.add_subplot(337)
+                    axe.imshow(i9)
+                    axe = fig.add_subplot(338)
+                    axe.imshow(i9)
+
+                    # Show histogram of the image
+                    hist, bin_edges = np.histogram(i9, bins=60)
+                    bin_centers = 0.5 * (bin_edges[:-1] + bin_edges[1:])
+                    plt.figure()
+                    plt.subplots_adjust(left=0.2)
+                    plt.bar(bin_centers[1:], hist[1:], width=5)
+                    plt.title('Histogram after')
+                    plt.xlabel('Greyscale bins')
+                    plt.ylabel('Number of pixels')
+
+                    axe = plt.gca()
+                    axe.spines['right'].set_visible(False)
+                    axe.spines['top'].set_visible(False)
+                    axe.yaxis.set_ticks_position('left')
+                    axe.xaxis.set_ticks_position('bottom')
+                    axe.tick_params(direction='out')
+                    # plt.savefig('hist_after.jpg')
+
+                    plt.show()
+                    continue
+
+                image_ori = i9
+
+            # crop background
+            if args['-c']:
+                image_ori = image_ori[400:1440, 550:1740].copy()
+                plt.figure()
+                plt.imshow(image_ori)
+
+            # down-sampling
+            if args['-d']:
+                image_ori = rescale(image_ori, args['-d'], mode='reflect')
+
+            # image_ori = rescale_intensity(image_ori)  # intensity adjustment
+            if np.issubdtype(image_ori.dtype.type, np.float):
+                image_ori = skimage.img_as_uint(image_ori)
+
+            print("Saving image = %s" % out_file)
+            imsave(out_file, image_ori)
+
+        print('Total processing time: %f s.' % (time.clock() - begin))
