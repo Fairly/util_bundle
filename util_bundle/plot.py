@@ -49,7 +49,7 @@ def catagrize_data(data):
     keywords = ['I', 'Ca', 'Na', 'K', 'CaMKII', 'V', 'J', 'CaM', 'RyR', 'Phos']
 
     re_tmp = re.compile(r'([A-Z][a-zA-Z]*)(?:_([a-zA-Z]*))*')
-    for j, label in enumerate(data['l_labels']):
+    for j, label in enumerate(data['l_field_names']):
         m = re.match(re_tmp, label)
         if m and m.group(1) in keywords:
             if m.group(1) not in data.keys():
@@ -59,59 +59,59 @@ def catagrize_data(data):
     return data
 
 
-def gen_data(l_input_filename, l_content_name):
+def gen_data(l_input_filename, l_labels):
     """
     This function is not stable now.
+    Stacks all data in different files into a single data structure.
     The first file in parameters should be the major file to plot. All data in the major file will
     be plotted, those in other files may not.
 
     :param l_input_filename:
-    :param l_content_name: list
+    :param l_labels: list
                 这个里面存的名字要和filename的文件内容对应，就是一个文件对应一条曲线的Label。
     """
     data = []
     for i, filename in enumerate(l_input_filename):
-        l_labels, npa_data = read_data_file(filename)
+        l_field_names, npa_data = read_data_file(filename)
         data.append({'data': npa_data,
-                     'l_labels': l_labels,
-                     'name': l_content_name[i]})
+                     'l_field_names': l_field_names,
+                     'label': l_labels[i]})
 
-        for label in data[i]['l_labels']:
+        for label in data[i]['l_field_names']:
+            # find the first field starts with 't' or 'T' as the xaxis
             if label.startswith(('t', 'T')):
                 data[i]['xaxis'] = label
                 break
 
-        if len(data[i]['l_labels']) < len(data[i]['data'][0]):
+        if len(data[i]['l_field_names']) < len(data[i]['data'][0]):
             raise Exception("\nErr: The data file named %s has something wrong.\n" % filename +
                             "Err: The length of its header is less than the length of data fields.")
-
-    data[0] = catagrize_data(data[0])
 
     return data
 
 
-def my_plot(data, l_labels, xlimit=None):
+def my_plot(data, l_field_names, xlimit=None):
     fig = plt.figure()
 
-    num_of_axes = len(l_labels)
+    num_of_axes = len(l_field_names)
     r, c = get_axes_num(num_of_axes)
 
     legend_flag = False
-    for i, column_label in enumerate(l_labels):
-        if column_label == data[0]['xaxis']:
+    for i, column_name in enumerate(l_field_names):
+        if column_name == data[0]['xaxis']:
             continue
 
         axe = fig.add_subplot(r, c, i + 1)
 
         for d in data:
-            if column_label in d['l_labels']:
+            if column_name in d['l_field_names']:
                 axe.plot(d['data'][d['xaxis']],
-                         d['data'][column_label],
-                         label=d['name'])
+                         d['data'][column_name],
+                         label=d['label'])
 
         if not iflastrow(c, i + 1, num_of_axes):
             axe.get_xaxis().set_visible(False)
-        axe.set_title(column_label)
+        axe.set_title(column_name)
         if xlimit is not None:
             axe.set_xlim(*xlimit)
         if not legend_flag:
@@ -141,26 +141,27 @@ def autoplot(l_input_filename, l_label, flags=('all',), xlimit=None, outfigname=
         max_end = max(new_end)
         xlimit = (0, max_end)
 
+    field_names = data[0]['l_field_names']
     if 'all' in flags:
-        if len(data[0]['l_labels']) < 10:
-            my_plot(data, data[0]['l_labels'].remove(data[0]['xaxis']), xlimit)
+        if len(field_names) < 10:
+            my_plot(data, field_names.remove(data[0]['xaxis']), xlimit)
         else:
+            # too many panels, separated to two figures
             my_plot(data, data[0]['V'] + data[0]['I'], xlimit)
-            my_plot(data, set(data[0]['l_labels']) - set(data[0]['V']) - set(data[0]['I']), xlimit)
+            my_plot(data, set(field_names) - set(data[0]['V']) - set(data[0]['I']), xlimit)
     else:
         l_gca = []
         for flag in flags:
-            if len(l_gca) < 8:
-                if flag in data[0]['l_labels']:
-                    l_gca.append(flag)
-                else:
-                    l_gca += data[0][flag]
-                continue
-            my_plot(data, l_gca, xlimit)
-            if flag in data[0]['l_labels']:
-                l_gca = [flag]
-            else:
-                l_gca = data[0][flag]
+            l_gca.extend([f_n for f_n in field_names if f_n.startswith(flag)])
+
+            if flag == 'V':
+                l_gca.extend([f_n for f_n in field_names if 'dV' in f_n])
+
+            l_gca = list(set(l_gca))
+            if len(l_gca) >= 8:
+                my_plot(data, l_gca, xlimit)
+                l_gca = []
+
         my_plot(data, l_gca, xlimit)
 
     if outfigname is not None:
