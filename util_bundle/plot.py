@@ -5,8 +5,6 @@
 """
 
 import re
-import sys
-from pprint import pprint
 
 import matplotlib.gridspec as gridspec
 import matplotlib.pyplot as plt
@@ -118,6 +116,9 @@ def my_plot(data, l_field_names, xlimit=None):
             axe.legend(prop={'size': 10})
             legend_flag = True
 
+    # let all axes share a same x-axis, making it easy to zoom in or out together
+    fig.axes[0].get_shared_x_axes().join(*fig.axes)
+
 
 def autoplot(l_input_filename, l_label, flags=('all',), xlimit=None, outfigname=None):
     """
@@ -137,7 +138,7 @@ def autoplot(l_input_filename, l_label, flags=('all',), xlimit=None, outfigname=
         new_end = []
         for s, e, d in zip(start, end, data):
             d['data'][d['xaxis']] = d['data'][d['xaxis']] - s  # translation the 'xaxis' column of d['data']
-            new_end.append(e-s)
+            new_end.append(e - s)
         max_end = max(new_end)
         xlimit = (0, max_end)
 
@@ -147,8 +148,10 @@ def autoplot(l_input_filename, l_label, flags=('all',), xlimit=None, outfigname=
             my_plot(data, field_names.remove(data[0]['xaxis']), xlimit)
         else:
             # too many panels, separated to two figures
-            my_plot(data, data[0]['V'] + data[0]['I'], xlimit)
-            my_plot(data, set(field_names) - set(data[0]['V']) - set(data[0]['I']), xlimit)
+            field_V_and_I = sorted([f_n for f_n in field_names if
+                                    'dV' in f_n or f_n.startswith('V') or f_n.startswith('I')])
+            my_plot(data, field_V_and_I, xlimit)
+            my_plot(data, sorted(set(field_names) - set(field_V_and_I)), xlimit)
     else:
         l_gca = []
         for flag in flags:
@@ -159,10 +162,11 @@ def autoplot(l_input_filename, l_label, flags=('all',), xlimit=None, outfigname=
 
             l_gca = list(set(l_gca))
             if len(l_gca) >= 8:
-                my_plot(data, l_gca, xlimit)
+                my_plot(data, sorted(l_gca), xlimit)
                 l_gca = []
 
-        my_plot(data, l_gca, xlimit)
+        if l_gca:
+            my_plot(data, sorted(l_gca), xlimit)
 
     if outfigname is not None:
         plt.savefig(outfigname)
