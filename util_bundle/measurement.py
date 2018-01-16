@@ -15,12 +15,37 @@ class DataError(Exception):
         return repr(self.value)
 
 
-def ap_recognition(data, time_prefix='t', stim_prefix='I_Stim'):
+def dt_recognition(data, time_prefix='t'):
     """
     The unit of dt is msec.
 
+    :param data:
+    :param time_prefix:
+    :return: float
+    """
+    time_name = ''
+    for header in data.dtype.names:
+        if header.startswith(time_prefix):
+            time_name = header
+            break
+
+    if time_name == '':
+        raise DataError("Cannot extract dt, "
+                        "please check 'time' is in the data file.")
+
+    i_t = data.dtype.names.index(time_name)
+
+    # dt equals the difference of t between 2 consecutive rows
+    dt = data[1][i_t] - data[0][i_t]
+
+    return dt
+
+
+def ap_recognition(data, time_prefix='t', stim_prefix='I_Stim'):
+    """
+
     Return:
-        (dt, [(start_point, BCL)...])
+        [(start_point, BCL)...]
 
     Raise:
         DataError
@@ -35,13 +60,10 @@ def ap_recognition(data, time_prefix='t', stim_prefix='I_Stim'):
             stim_name = header
     if time_name == '' or stim_name == '':
         raise DataError("Cannot extract BCL or dt "
-                        "if time or stimulation is not in the data file.")
+                        "please check 'stimulus' is in the data file.")
 
     i_t = data.dtype.names.index(time_name)
     i_i_stim = data.dtype.names.index(stim_name)
-
-    # dt equals the difference of t between 2 consecutive rows
-    dt = data[1][i_t] - data[0][i_t]
 
     # find all stimuli
     l_stim = []
@@ -68,7 +90,7 @@ def ap_recognition(data, time_prefix='t', stim_prefix='I_Stim'):
         else:
             l_ap.append((stim, l_stim[i + 1] - stim))
 
-    return dt, l_ap
+    return l_ap
 
 
 def get_range(beat, dt, l_ap):
@@ -105,7 +127,8 @@ def measure(infilename):
     # read and save data to truncate them
     # noinspection PyTypeChecker
     data = np.genfromtxt(infilename, names=True, delimiter="\t")
-    dt, l_ap = ap_recognition(data)
+    dt = dt_recognition(data)
+    l_ap = ap_recognition(data)
     num_bcl = len(l_ap)
 
     if num_bcl == 0:
