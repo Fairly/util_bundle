@@ -19,7 +19,7 @@ import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
 
 from util import read_data_file, save_data_file, bar_arrange, write_scalar_vtk
-from util_bundle.measurement import ap_recognition, get_range
+from util_bundle.measurement import dt_recognition, ap_recognition, get_range
 import measurement
 import plot as myplot
 
@@ -81,18 +81,19 @@ Arguments:
 
 class clean(AbstractCommand):
     """
-usage: clean [-ru] [-t num] <FILE>...
+usage: clean [options] <FILE>...
 
 Clean the data file. Original file will be backed up.
 
 Options:
-    -r --reset-time
-                If the start time is not 0, whether to reset it to 0.
     -t=num, --truncate=num
-                Whether truncate the result file to a provided `num`
-                of beats.
+                Whether truncate the result file to tailing `num` of rows.
+    -s=dt, --shrink=dt
+                Use a new dt bigger than the one in data files to shrink it.
     -u --underline
                 Whether add a '_' mark to every field in header names.
+    -r --reset-time
+                If the start time is not 0, whether to reset it to 0.
 Arguments:
     <FILE>...   Files to be processed.
     """
@@ -100,51 +101,87 @@ Arguments:
     def execute(self):
         schema = Schema({'--reset-time': bool,
                          '--truncate': Or(None, Use(int)),
+                         '--shrink': Or(None, Use(float)),
                          '--underline': bool,
                          '<FILE>': Or(None, [os.path.isfile], error='Cannot find file[s].'),
                          }
                         )
 
-        self.args = schema.validate(self.args)
+        args = schema.validate(self.args)
 
-        def clean_result_for_plot(filename, add_underline=True, truncate_to=None,
-                                  reset_start_time=True, tail=True):  # TODO parameter `tail`
+        def clean_result_for_plot(filename, add_underline=False, truncate_to=None, shrink=None,
+                                  reset_start_time=False, tail=True):  # TODO parameter `tail`
             """
             When plotting a result, it's common to reduce the size of the result file first.
-
-            :param filename:
-            :param add_underline: whether add a '_' mark to every field in header names
-            :param reset_start_time: if the start time is not 0, whether to reset it to 0
-            :param truncate_to: whether truncate the result file to a single beat (the final beat)
-            :return:
             """
-            backup = '.backup.dat'
+            from subprocess import call
+            backup_file_name = filename + '.backup.dat'
+            tmp_file_name = 'tmp.dat'
 
-            shutil.copyfile(filename, filename + backup)
-
-            headers, data = read_data_file(filename + backup)
-
-            if add_underline and not headers[0].endswith('_'):
-                for i, tag in enumerate(headers):
-                    headers[i] = tag + '_'
+            shutil.copyfile(filename, backup_file_name)  # backup
+            shutil.move(filename, tmp_file_name)
 
             if truncate_to is not None:
-                dt, beats = ap_recognition(data)
-                start, _ = get_range(len(beats) - truncate_to, dt, beats)
-                _, end = get_range(len(beats) - 1, dt, beats)
-                data = data[start:end + 1]
+                # use shell command is usually faster than python itself
+                to_file = open(filename, mode="w")
+                call(['head', '-n', '1', tmp_file_name], stdout=to_file)
+                to_file.close()
+
+                to_file = open(filename, mode="a")
+                call(['tail', '-n', str(truncate_to), tmp_file_name], stdout=to_file)
+                to_file.close()
+
+                shutil.move(filename, tmp_file_name)
+
+            if shrink is not None:
+                _, data = read_data_file(tmp_file_name, max_rows=2)  # read only 2 data lines to speed up
+                dt = dt_recognition(data)
+                multiplier = int(shrink / dt)
+
+                to_file = open(filename, mode="w")
+                # save the first and second line, then every `multiplier`th line to file
+                call(['awk', 'NR == 1 || NR ==2 || (NR-2) % ' + str(multiplier) + ' == 0', tmp_file_name],
+                     stdout=to_file)
+                to_file.close()
+
+                shutil.move(filename, tmp_file_name)
+
+            if add_underline:
+                headers, _ = read_data_file(tmp_file_name, max_rows=2)  # read only 2 data lines to speed up
+
+                if not headers[0].endswith('_'):
+                    for i, tag in enumerate(headers):
+                        headers[i] = tag + '_'
+
+                    # these code seems cumbersome, but fast!
+                    from_file = open(tmp_file_name)
+                    from_file.readline()
+                    to_file = open(filename, mode="w")
+                    to_file.write('\t'.join(headers))
+                    shutil.copyfileobj(from_file, to_file)
+
+                    shutil.move(filename, tmp_file_name)
 
             if reset_start_time:
-                time_offset = data[0][0] - (data[1][0] - data[0][0])  # time of 1st row minus dt
-                for row in data:
-                    row[0] = row[0] - time_offset
+                headers, data = read_data_file(tmp_file_name)
+                dt = dt_recognition(data)
+                if data[0][0] == dt:  # start time equals dt, don't need to reset
+                    pass
+                else:
+                    time_offset = data[0][0] - (data[1][0] - data[0][0])  # time of 1st row minus dt
+                    data['t'] -= time_offset
+                    save_data_file(filename, header=headers, data=data)
 
-            save_data_file(filename, headers, data)
+                shutil.move(filename, tmp_file_name)
 
-        for f in self.args['<FILE>']:
-            clean_result_for_plot(f, add_underline=self.args['--underline'],
-                                  truncate_to=self.args['--truncate'],
-                                  reset_start_time=self.args['--reset-time'])
+            # all operations done
+            shutil.move(tmp_file_name, filename)
+
+        for f in args['<FILE>']:
+            clean_result_for_plot(f, add_underline=args['--underline'],
+                                  truncate_to=args['--truncate'],
+                                  shrink=args['--shrink'],
+                                  reset_start_time=args['--reset-time'])
 
 
 class qplot(AbstractCommand):
@@ -1130,7 +1167,7 @@ Arguments:
 
         # initialise variables
         volume = np.zeros((num_of_figure, y, x), dtype=ndtype)
-        if args['-n'] and args['-n']+num_of_figure <= len(files):
+        if args['-n'] and args['-n'] + num_of_figure <= len(files):
             start = args['-n']
         else:
             start = 0
