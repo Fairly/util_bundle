@@ -4,17 +4,17 @@ import numpy as np
 
 # File handling
 
-def read_data_file(filename):
+def read_data_file(filename, max_rows=None):
     with open(filename, 'r') as f_in:
         first_line = f_in.readline().strip()
         first_field = first_line.split('\t')[0]
 
         try:  # no header
             float(first_field)
-            npa_data = np.genfromtxt(filename, delimiter="\t", dtype='f8')
+            npa_data = np.genfromtxt(filename, delimiter="\t", dtype='f8', max_rows=max_rows)
             l_labels = None
         except ValueError:  # with header
-            npa_data = np.genfromtxt(filename, delimiter="\t", dtype='f8', names=True)
+            npa_data = np.genfromtxt(filename, delimiter="\t", dtype='f8', names=True, max_rows=max_rows)
 
             f_in.seek(0)
             header = f_in.readline().strip()
@@ -35,9 +35,9 @@ def save_data_file(filename, header, data):
     """
     if header is not None:
         header_ = '\t'.join(header)
-        np.savetxt(filename, data, fmt='%f', delimiter='\t', comments='', newline='\n', header=header_)
+        np.savetxt(filename, data, fmt='%.5g', delimiter='\t', comments='', newline='\n', header=header_)
     else:
-        np.savetxt(filename, data, fmt='%f', delimiter='\t', comments='', newline='\n')
+        np.savetxt(filename, data, fmt='%.5g', delimiter='\t', comments='', newline='\n')
 
 
 # Plot utils
