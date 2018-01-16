@@ -155,13 +155,16 @@ def autoplot(l_input_filename, l_label, flags=('all',), xlimit=None, outfigname=
     else:
         l_gca = []
         for flag in flags:
-            l_gca.extend([f_n for f_n in field_names if f_n.startswith(flag)])
+            if flag in field_names:
+                l_gca.append(flag)
+            else:
+                l_gca.extend([f_n for f_n in field_names if f_n.startswith(flag)])
 
             if flag == 'V':
                 l_gca.extend([f_n for f_n in field_names if 'dV' in f_n])
 
             l_gca = list(set(l_gca))
-            if len(l_gca) >= 8:
+            if len(l_gca) >= 9:
                 my_plot(data, sorted(l_gca), xlimit)
                 l_gca = []
 
