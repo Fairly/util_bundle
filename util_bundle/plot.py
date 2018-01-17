@@ -145,7 +145,8 @@ def autoplot(l_input_filename, l_label, flags=('all',), xlimit=None, outfigname=
     field_names = data[0]['l_field_names']
     if 'all' in flags:
         if len(field_names) < 10:
-            my_plot(data, field_names.remove(data[0]['xaxis']), xlimit)
+            field_names.remove(data[0]['xaxis'])
+            my_plot(data, field_names, xlimit)
         else:
             # too many panels, separated to two figures
             field_V_and_I = sorted([f_n for f_n in field_names if
