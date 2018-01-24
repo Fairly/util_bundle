@@ -93,8 +93,8 @@ Options:
                 Use a new dt bigger than the one in data files to shrink it.
     -u --underline
                 Whether add a '_' mark to every field in header names.
-    -r --reset-time
-                If the start time is not 0, whether to reset it to 0.
+    -r=time --reset-time=time
+                If the start time is not 'time', reset it to 'time'.
     -R --recover
                 If regret, try this. Recover from backup files.
 Arguments:
@@ -103,7 +103,7 @@ Arguments:
     """
 
     def execute(self):
-        schema = Schema({'--reset-time': bool,
+        schema = Schema({'--reset-time': Or(None, Use(float)),
                          '--truncate': Or(None, Use(int)),
                          '--shrink': Or(None, Use(float)),
                          '--underline': bool,
@@ -171,11 +171,11 @@ Arguments:
             if reset_start_time:
                 headers, data = read_data_file(tmp_file_name)
                 dt = dt_recognition(data)
-                if data[0][0] == dt:  # start time equals dt, don't need to reset
+                if data[0][0] == reset_start_time:  # don't need to reset
                     pass
                 else:
-                    time_offset = data[0][0] - (data[1][0] - data[0][0])  # time of 1st row minus dt
-                    data['t'] -= time_offset
+                    time_offset = reset_start_time - data[0][0]
+                    data['t'] += time_offset
                     save_data_file(filename, header=headers, data=data)
 
                 shutil.move(filename, tmp_file_name)
