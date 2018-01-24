@@ -6,12 +6,32 @@
 
 import re
 
-import matplotlib.gridspec as gridspec
-import matplotlib.pyplot as plt
 import numpy as np
 from numpy import ceil, floor
+import matplotlib.pyplot as plt
+import matplotlib.gridspec as gridspec
+from matplotlib.ticker import FormatStrFormatter
 
 from util_bundle.util import read_data_file
+
+
+def panel_key_order(name):
+    if name.startswith('V') or 'dV' in name:
+        return '\0' + name  # make the AP always the first panel in a figure
+    elif name.startswith('I_Na'):
+        return '\1' + name
+    elif name.startswith('I_Ca'):
+        return '\2' + name
+    elif name.startswith('I_to'):
+        return '\3' + name
+    elif name.startswith('I_Kr'):
+        return '\4' + name
+    elif name.startswith('I_Ks'):
+        return '\5' + name
+    elif name.startswith('I_K'):
+        return '\6' + name
+    else:
+        return name
 
 
 def get_axes_num(n):
@@ -95,6 +115,7 @@ def my_plot(data, l_field_names, xlimit=None):
     r, c = get_axes_num(num_of_axes)
 
     legend_flag = False
+    major_form = FormatStrFormatter('%g')
     for i, column_name in enumerate(l_field_names):
         if column_name == data[0]['xaxis']:
             continue
@@ -106,6 +127,7 @@ def my_plot(data, l_field_names, xlimit=None):
                 axe.plot(d['data'][d['xaxis']],
                          d['data'][column_name],
                          label=d['label'])
+                axe.yaxis.set_major_formatter(major_form)
 
         if not iflastrow(c, i + 1, num_of_axes):
             axe.get_xaxis().set_visible(False)
@@ -113,7 +135,7 @@ def my_plot(data, l_field_names, xlimit=None):
         if xlimit is not None:
             axe.set_xlim(*xlimit)
         if not legend_flag:
-            axe.legend(prop={'size': 10})
+            axe.legend(prop={'size': 10}, loc='upper right')
             legend_flag = True
 
     # let all axes share a same x-axis, making it easy to zoom in or out together
@@ -150,9 +172,9 @@ def autoplot(l_input_filename, l_label, flags=('all',), xlimit=None, outfigname=
         else:
             # too many panels, separated to two figures
             field_V_and_I = sorted([f_n for f_n in field_names if
-                                    'dV' in f_n or f_n.startswith('V') or f_n.startswith('I')])
+                                    'dV' in f_n or f_n.startswith('V') or f_n.startswith('I')], key=panel_key_order)
             my_plot(data, field_V_and_I, xlimit)
-            my_plot(data, sorted(set(field_names) - set(field_V_and_I)), xlimit)
+            my_plot(data, sorted(set(field_names) - set(field_V_and_I), key=panel_key_order), xlimit)
     else:
         l_gca = []
         for flag in flags:
@@ -166,11 +188,11 @@ def autoplot(l_input_filename, l_label, flags=('all',), xlimit=None, outfigname=
 
             l_gca = list(set(l_gca))
             if len(l_gca) >= 9:
-                my_plot(data, sorted(l_gca), xlimit)
+                my_plot(data, sorted(l_gca, key=panel_key_order), xlimit)
                 l_gca = []
 
         if l_gca:
-            my_plot(data, sorted(l_gca), xlimit)
+            my_plot(data, sorted(l_gca, key=panel_key_order), xlimit)
 
     if outfigname is not None:
         plt.savefig(outfigname)
