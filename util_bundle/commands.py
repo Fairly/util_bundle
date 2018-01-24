@@ -82,6 +82,7 @@ Arguments:
 class clean(AbstractCommand):
     """
 usage: clean [options] <FILE>...
+       clean -R <BACKUPFILE>...
 
 Clean the data file. Original file will be backed up.
 
@@ -94,8 +95,11 @@ Options:
                 Whether add a '_' mark to every field in header names.
     -r --reset-time
                 If the start time is not 0, whether to reset it to 0.
+    -R --recover
+                If regret, try this. Recover from backup files.
 Arguments:
-    <FILE>...   Files to be processed.
+    <FILE>...          Files to be processed.
+    <BACKUPFILE>...    Names of backup files.
     """
 
     def execute(self):
@@ -103,7 +107,9 @@ Arguments:
                          '--truncate': Or(None, Use(int)),
                          '--shrink': Or(None, Use(float)),
                          '--underline': bool,
+                         '--recover': bool,
                          '<FILE>': Or(None, [os.path.isfile], error='Cannot find file[s].'),
+                         '<BACKUPFILE>': Or(None, [os.path.isfile], error='Cannot find file[s].'),
                          }
                         )
 
@@ -177,11 +183,16 @@ Arguments:
             # all operations done
             shutil.move(tmp_file_name, filename)
 
-        for f in args['<FILE>']:
-            clean_result_for_plot(f, add_underline=args['--underline'],
-                                  truncate_to=args['--truncate'],
-                                  shrink=args['--shrink'],
-                                  reset_start_time=args['--reset-time'])
+        if args['--recover']:
+            for f in args['<BACKUPFILE>']:
+                original_file = f.replace('.backup.dat', '')
+                shutil.move(f, original_file)
+        else:
+            for f in args['<FILE>']:
+                clean_result_for_plot(f, add_underline=args['--underline'],
+                                      truncate_to=args['--truncate'],
+                                      shrink=args['--shrink'],
+                                      reset_start_time=args['--reset-time'])
 
 
 class qplot(AbstractCommand):
