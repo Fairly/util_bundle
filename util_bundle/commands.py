@@ -233,7 +233,7 @@ Arguments:
             '-o': Or(None, And(str, len)),
             '-x': bool,
             '-s': bool,
-            '<FILE>': [str],
+            '<FILE>': [os.path.isfile],
             '<LABEL>': [str],
             '<XEND>': Or(None, Use(float)),
             '<XSTART>': Or(None, Use(float)),
@@ -268,6 +268,33 @@ Arguments:
 
         myplot.autoplot(args['<FILE>'], args['<LABEL>'],
                         flags=plot_flag, outfigname=args['-o'], xlimit=xlim)
+
+
+class plotvc(AbstractCommand):
+    """
+Usage:  plotvc [-s=start] [-e=end] <YAMLFILE>
+
+Options:
+  -s=start    Set the start time of plotting, since the holding time is usually too long. [default: 1]
+  -e=end      Set the number in mili-seconds truncated from the end. [default: 0]
+
+Arguments:
+  <YAMLFILE>  The config file containing the voltage clamp protocol.
+    """
+
+    def execute(self):
+        schema = Schema({
+            "-s": Use(int),
+            "-e": Use(int),
+            "<YAMLFILE>": os.path.isfile,
+        }
+        )
+
+        args = schema.validate(self.args)
+
+        import plotvc as pvc
+        f = open(args["<YAMLFILE>"], 'r')
+        pvc.plotvc(f, start=args['-s'], end=args['-e'])
 
 
 class freq(AbstractCommand):
@@ -1251,7 +1278,7 @@ Arguments:
             '-o': And(str, len),
             '-p': bool,
             '-i': bool,
-            '<PATH>': Or(None, os.path.isdir, os.path.isfile),
+            '<PATH>': Or(os.path.isdir, os.path.isfile),
         })
 
         args = schema.validate(self.args)
