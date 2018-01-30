@@ -77,7 +77,7 @@ def catagrize_data(data):
     return data
 
 
-def gen_data(l_input_filename, l_labels):
+def gen_data(l_input_filename, l_labels=None):
     """
     This function is not stable now.
     Stacks all data in different files into a single data structure.
@@ -93,12 +93,12 @@ def gen_data(l_input_filename, l_labels):
         l_field_names, npa_data = read_data_file(filename)
         data.append({'data': npa_data,
                      'l_field_names': l_field_names,
-                     'label': l_labels[i]})
+                     'label': l_labels[i] if l_labels else None})
 
-        for label in data[i]['l_field_names']:
+        for field in data[i]['l_field_names']:
             # find the first field starts with 't' or 'T' as the xaxis
-            if label.startswith(('t', 'T')):
-                data[i]['xaxis'] = label
+            if field.startswith(('t', 'T')):
+                data[i]['xaxis'] = field
                 break
 
         if len(data[i]['l_field_names']) < len(data[i]['data'][0]):
@@ -134,7 +134,7 @@ def my_plot(data, l_field_names, xlimit=None):
         axe.set_title(column_name)
         if xlimit is not None:
             axe.set_xlim(*xlimit)
-        if not legend_flag:
+        if not legend_flag and data[0]['label']:
             axe.legend(prop={'size': 10}, loc='upper right')
             legend_flag = True
 
@@ -142,7 +142,7 @@ def my_plot(data, l_field_names, xlimit=None):
     fig.axes[0].get_shared_x_axes().join(*fig.axes)
 
 
-def autoplot(l_input_filename, l_label, flags=('all',), xlimit=None, outfigname=None):
+def autoplot(l_input_filename, l_label=None, flags=('all',), xlimit=None, outfigname=None):
     """
     
 

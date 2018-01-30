@@ -201,6 +201,7 @@ An quick interface for plotting and comparing APs or currents.
 
 usage: qplot [options] [(-x <XSTART> <XEND>)] (<FILE> <LABEL>)...
        qplot [options] -s (<FSTART> <FEND> <FILE> <LABEL>)...
+       qplot [options] [(-x <XSTART> <XEND>)] -W <FILE>...
 
 Options:
     -V          Trigger for whether plotting the AP.
@@ -215,12 +216,14 @@ Options:
     -x          Whether set limits on the x axis.
     -s          Separately set x-limits of all FILEs.
 
+    -W          If this is set, no need to provide labels for files.
+
 Arguments:
-    XSTART XEND
+    <XSTART> <XEND>
                 The starting and ending points of x-limits.
-    FILE LABEL
-                One Label for one file.
-    FSTART FEND
+    <FILE>      File names.
+    <LABEL>     One Label for one file.
+    <FSTART> <FEND>
                 The starting and ending points of x-limits of each FILE.
     """
 
@@ -233,8 +236,9 @@ Arguments:
             '-o': Or(None, And(str, len)),
             '-x': bool,
             '-s': bool,
+            '-W': bool,
             '<FILE>': [os.path.isfile],
-            '<LABEL>': [str],
+            '<LABEL>': Or(None, [str]),
             '<XEND>': Or(None, Use(float)),
             '<XSTART>': Or(None, Use(float)),
             '<FEND>': Or(None, [Use(float)]),
