@@ -108,7 +108,7 @@ def gen_data(l_input_filename, l_labels=None):
     return data
 
 
-def my_plot(data, l_field_names, xlimit=None):
+def my_plot(data, l_field_names, xlimit=None, color=None):
     fig = plt.figure()
 
     num_of_axes = len(l_field_names)
@@ -124,9 +124,14 @@ def my_plot(data, l_field_names, xlimit=None):
 
         for d in data:
             if column_name in d['l_field_names']:
-                axe.plot(d['data'][d['xaxis']],
-                         d['data'][column_name],
-                         label=d['label'])
+                if color:
+                    axe.plot(d['data'][d['xaxis']],
+                             d['data'][column_name],
+                             label=d['label'], color=color)
+                else:
+                    axe.plot(d['data'][d['xaxis']],
+                             d['data'][column_name],
+                             label=d['label'])
                 axe.yaxis.set_major_formatter(major_form)
 
         if not iflastrow(c, i + 1, num_of_axes):
@@ -142,7 +147,8 @@ def my_plot(data, l_field_names, xlimit=None):
     fig.axes[0].get_shared_x_axes().join(*fig.axes)
 
 
-def autoplot(l_input_filename, l_label=None, flags=('all',), xlimit=None, outfigname=None):
+def autoplot(l_input_filename, l_label=None, flags=('all',),
+             xlimit=None, outfigname=None, color=None):
     """
     
 
@@ -168,13 +174,13 @@ def autoplot(l_input_filename, l_label=None, flags=('all',), xlimit=None, outfig
     if 'all' in flags:
         if len(field_names) < 10:
             field_names.remove(data[0]['xaxis'])
-            my_plot(data, field_names, xlimit)
+            my_plot(data, field_names, xlimit, color)
         else:
             # too many panels, separated to two figures
             field_V_and_I = sorted([f_n for f_n in field_names if
                                     'dV' in f_n or f_n.startswith('V') or f_n.startswith('I')], key=panel_key_order)
-            my_plot(data, field_V_and_I, xlimit)
-            my_plot(data, sorted(set(field_names) - set(field_V_and_I), key=panel_key_order), xlimit)
+            my_plot(data, field_V_and_I, xlimit, color)
+            my_plot(data, sorted(set(field_names) - set(field_V_and_I), key=panel_key_order), xlimit, color)
     else:
         l_gca = []
         for flag in flags:
@@ -188,11 +194,11 @@ def autoplot(l_input_filename, l_label=None, flags=('all',), xlimit=None, outfig
 
             l_gca = list(set(l_gca))
             if len(l_gca) >= 9:
-                my_plot(data, sorted(l_gca, key=panel_key_order), xlimit)
+                my_plot(data, sorted(l_gca, key=panel_key_order), xlimit, color)
                 l_gca = []
 
         if l_gca:
-            my_plot(data, sorted(l_gca, key=panel_key_order), xlimit)
+            my_plot(data, sorted(l_gca, key=panel_key_order), xlimit, color)
 
     if outfigname is not None:
         plt.savefig(outfigname)

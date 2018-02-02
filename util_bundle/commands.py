@@ -210,6 +210,8 @@ Options:
     -C=CTM      Customized plotting prefixes, separated by ','. For example,
                 "V,I" means plotting fields whose name starts with "V" or "I".
 
+    -c          If set, using only black color for plotting.
+
     -o=OUT      The file name of the output figure.
                 If not given, show the figure instead of saving it.
 
@@ -233,6 +235,7 @@ Arguments:
             '-V': bool,
             '-A': bool,
             '-C': Or(None, And(str, len)),
+            '-c': bool,
             '-o': Or(None, And(str, len)),
             '-x': bool,
             '-s': bool,
@@ -270,8 +273,14 @@ Arguments:
         else:
             xlim = None
 
+        if args['-c']:
+            color = 'k'
+        else:
+            color = None
+
         myplot.autoplot(args['<FILE>'], args['<LABEL>'],
-                        flags=plot_flag, outfigname=args['-o'], xlimit=xlim)
+                        flags=plot_flag, outfigname=args['-o'], xlimit=xlim,
+                        color=color)
 
 
 class plotvc(AbstractCommand):
