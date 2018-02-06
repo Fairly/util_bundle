@@ -168,9 +168,8 @@ Arguments:
 
                     shutil.move(filename, tmp_file_name)
 
-            if reset_start_time:
+            if reset_start_time is not None:
                 headers, data = read_data_file(tmp_file_name)
-                dt = dt_recognition(data)
                 if data[0][0] == reset_start_time:  # don't need to reset
                     pass
                 else:
