@@ -7,19 +7,12 @@ from subprocess import call
 from docopt import docopt
 from schema import Schema, Or, Use, And
 import numpy as np
-import time
-# from scipy.misc import imread, imsave, imresize
-# from skimage.exposure import rescale_intensity
-from skimage.io import imread, imsave
-import skimage
-import skimage.filters
-import skimage.draw
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
 
-from util import read_data_file, save_data_file, bar_arrange, write_scalar_vtk
-from util_bundle.measurement import dt_recognition, ap_recognition, get_range
+from util import read_data_file, save_data_file, bar_arrange
+from util_bundle.measurement import dt_recognition
 import measurement
 import plot as myplot
 
@@ -200,7 +193,7 @@ An quick interface for plotting and comparing APs or currents.
 
 usage: qplot [options] [(-x <XSTART> <XEND>)] (<FILE> <LABEL>)...
        qplot [options] -s (<FSTART> <FEND> <FILE> <LABEL>)...
-       qplot [options] [(-x <XSTART> <XEND>)] -W <FILE>...
+       qplot [options] [(-x <XSTART> <XEND>)] -L <FILE>...
 
 Options:
     -V          Trigger for whether plotting the AP.
@@ -210,6 +203,7 @@ Options:
                 "V,I" means plotting fields whose name starts with "V" or "I".
 
     -c          If set, using only black color for plotting.
+    -S          Using mpl_setting.py to set default matplotlib.
 
     -o=OUT      The file name of the output figure.
                 If not given, show the figure instead of saving it.
@@ -217,7 +211,7 @@ Options:
     -x          Whether set limits on the x axis.
     -s          Separately set x-limits of all FILEs.
 
-    -W          If this is set, no need to provide labels for files.
+    -L          If this is set, no need to provide labels for files.
 
 Arguments:
     <XSTART> <XEND>
@@ -235,10 +229,11 @@ Arguments:
             '-A': bool,
             '-C': Or(None, And(str, len)),
             '-c': bool,
+            '-S': bool,
             '-o': Or(None, And(str, len)),
             '-x': bool,
             '-s': bool,
-            '-W': bool,
+            '-L': bool,
             '<FILE>': [os.path.isfile],
             '<LABEL>': Or(None, [str]),
             '<XEND>': Or(None, Use(float)),
@@ -279,7 +274,7 @@ Arguments:
 
         myplot.autoplot(args['<FILE>'], args['<LABEL>'],
                         flags=plot_flag, outfigname=args['-o'], xlimit=xlim,
-                        color=color)
+                        color=color, mplsetting=args['-S'])
 
 
 class plotvc(AbstractCommand):
@@ -288,7 +283,7 @@ Usage:  plotvc [-s=start] [-e=end] <YAMLFILE>
 
 Options:
   -s=start    Set the start time of plotting, since the holding time is usually too long. [default: 1]
-  -e=end      Set the number in mili-seconds truncated from the end. [default: 0]
+  -e=end      Set the number in multi-seconds truncated from the end. [default: 0]
 
 Arguments:
   <YAMLFILE>  The config file containing the voltage clamp protocol.
@@ -1185,81 +1180,8 @@ Arguments:
 
         args = schema.validate(self.args)
 
-        files = [os.path.join(args['<DIR>'], f)
-                 for f in os.listdir(args['<DIR>'])
-                 if os.path.isfile(os.path.join(args['<DIR>'], f))
-                 and f.endswith(args['-s'])]
-
-        if args['-m']:
-            num_of_figure = min(args['-m'], len(files))
-        else:
-            num_of_figure = len(files)
-
-        # Read one of the figures to get its dimensions
-        filename = files[0]
-        image_ori = imread(filename)
-
-        y, x = image_ori.shape  # Get the dimensions of figures
-
-        if args['-t'] is not None:
-            ndtype = np.dtype(args['-t'])
-        else:
-            ndtype = image_ori.dtype
-
-        # choose the right function to convert the data type in an image
-        map_ndtype2func = {
-            np.bool_: skimage.img_as_bool,
-            np.uint8: skimage.img_as_ubyte,
-            np.uint16: skimage.img_as_uint,
-            np.float64: skimage.img_as_float,
-        }
-        convert_func = map_ndtype2func[ndtype.type]
-
-        # initialise variables
-        volume = np.zeros((num_of_figure, y, x), dtype=ndtype)
-        if args['-n'] and args['-n'] + num_of_figure <= len(files):
-            start = args['-n']
-        else:
-            start = 0
-
-        begin = time.clock()
-        # Iterate all figures to fill the 3D volume
-        for i in range(0, num_of_figure):
-            filename = files[start + i]
-
-            print('Reading image = %s' % filename)
-            image_ori = imread(filename)
-
-            image_ori = convert_func(image_ori)
-
-            volume[i, :, :] = image_ori
-
-        if args['-p']:
-            if not os.path.exists(args['-o']):
-                os.mkdir(args['-o'])
-
-            outputfiles = [os.path.join(args['-o'], str(i) + '.tif') for i in range(y)]
-
-            for i in range(y):
-                imsave(outputfiles[i], volume[:, i, :])
-
-            exit(0)
-
-        if args['-i']:
-            t = volume.dtype
-            volume = volume * (np.iinfo(volume.dtype).max / volume.max())
-            volume = volume.astype(t)
-
-        print()
-        print('Total image processing time: %f s.' % (time.clock() - begin))
-        print('Single image processing time: %f s.' % ((time.clock() - begin) / num_of_figure))
-        print()
-
-        begin = time.clock()
-        print('Constructing vtk file ...')
-        write_scalar_vtk(volume, args['-r'], args['-o'], ifbinary=args['-b'])
-        print('Total vtk output time: %f s.' % (time.clock() - begin))
-        print('Single slice output time: %f s.' % ((time.clock() - begin) / num_of_figure))
+        import reconstruction
+        reconstruction.construct_3D(args)
 
 
 class prep(AbstractCommand):

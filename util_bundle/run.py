@@ -16,6 +16,7 @@ Command:
   measure       Calculate characteristics of APs from results of cell models.
   qplot         Plot AP or current traces by a simple script.
   plot          Plot figures.
+  plotvc        Plot the curve of voltage clamp protocol.
 
   con3d        Do 3D geometry construction.
   prep         Pre-process original images.

@@ -13,6 +13,12 @@ import matplotlib.gridspec as gridspec
 from matplotlib.ticker import FormatStrFormatter
 
 from util_bundle.util import read_data_file
+import mpl_setting
+
+
+def to_tex_math(field_name):
+    before, _, after = field_name.partition('_')
+    return '${0}_{{{1}}}$'.format(before, after.replace('_', '\_'))
 
 
 def panel_key_order(name):
@@ -108,8 +114,11 @@ def gen_data(l_input_filename, l_labels=None):
     return data
 
 
-def my_plot(data, l_field_names, xlimit=None, color=None):
-    fig = plt.figure()
+def my_plot(data, l_field_names, xlimit=None, color=None, mplsetting=False):
+    if mplsetting:
+        fig = plt.figure(figsize=[mpl_setting.fig_size[0] / 2, mpl_setting.fig_size[1] / 4])
+    else:
+        fig = plt.figure()
 
     num_of_axes = len(l_field_names)
     r, c = get_axes_num(num_of_axes)
@@ -136,7 +145,16 @@ def my_plot(data, l_field_names, xlimit=None, color=None):
 
         if not iflastrow(c, i + 1, num_of_axes):
             axe.get_xaxis().set_visible(False)
-        axe.set_title(column_name)
+
+        ylabel_name = to_tex_math(column_name)
+        if column_name == 'V_m':
+            ylabel_name += ' (mV)'
+        elif 'dV' in column_name:
+            ylabel_name += ' (mV/ms)'
+        elif column_name.startswith('I'):
+            ylabel_name += ' (pA/pF)'
+        axe.set_ylabel(ylabel_name)
+
         if xlimit is not None:
             axe.set_xlim(*xlimit)
         if not legend_flag and data[0]['label']:
@@ -148,16 +166,21 @@ def my_plot(data, l_field_names, xlimit=None, color=None):
 
 
 def autoplot(l_input_filename, l_label=None, flags=('all',),
-             xlimit=None, outfigname=None, color=None):
+             xlimit=None, outfigname=None, color=None, mplsetting=False):
     """
-    
 
+
+    :param mplsetting:
+    :param color:
     :param l_input_filename:
     :param l_label:
     :param flags:
     :param xlimit: None, tuple or a tuple of two list
     :param outfigname: If no fig name is given, no fig will be saved.
     """
+    if mplsetting:
+        mpl_setting.set_matplotlib_default()
+
     data = gen_data(l_input_filename, l_label)
 
     # translation data to align them
@@ -174,13 +197,13 @@ def autoplot(l_input_filename, l_label=None, flags=('all',),
     if 'all' in flags:
         if len(field_names) < 10:
             field_names.remove(data[0]['xaxis'])
-            my_plot(data, field_names, xlimit, color)
+            my_plot(data, field_names, xlimit, color, mplsetting)
         else:
             # too many panels, separated to two figures
             field_V_and_I = sorted([f_n for f_n in field_names if
                                     'dV' in f_n or f_n.startswith('V') or f_n.startswith('I')], key=panel_key_order)
-            my_plot(data, field_V_and_I, xlimit, color)
-            my_plot(data, sorted(set(field_names) - set(field_V_and_I), key=panel_key_order), xlimit, color)
+            my_plot(data, field_V_and_I, xlimit, color, mplsetting)
+            my_plot(data, sorted(set(field_names) - set(field_V_and_I), key=panel_key_order), xlimit, color, mplsetting)
     else:
         l_gca = []
         for flag in flags:
@@ -194,11 +217,11 @@ def autoplot(l_input_filename, l_label=None, flags=('all',),
 
             l_gca = list(set(l_gca))
             if len(l_gca) >= 9:
-                my_plot(data, sorted(l_gca, key=panel_key_order), xlimit, color)
+                my_plot(data, sorted(l_gca, key=panel_key_order), xlimit, color, mplsetting)
                 l_gca = []
 
         if l_gca:
-            my_plot(data, sorted(l_gca, key=panel_key_order), xlimit, color)
+            my_plot(data, sorted(l_gca, key=panel_key_order), xlimit, color, mplsetting)
 
     if outfigname is not None:
         plt.savefig(outfigname)
