@@ -1,11 +1,17 @@
+import sys
 import os
 import time
 
 import numpy as np
-from skimage.io import imread, imsave
-import skimage
-import skimage.filters
-import skimage.draw
+try:
+    import skimage
+    from skimage.io import imread, imsave
+    import skimage.filters
+    import skimage.draw
+except ImportError:
+    print("Error: Package 'skimage' is needed when doing image processing. "
+          "See 'http://scikit-image.org' for details.", file=sys.stderr)
+    sys.exit(1)
 
 from util import write_scalar_vtk
 

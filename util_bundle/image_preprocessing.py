@@ -1,11 +1,17 @@
+import sys
 import os
 import time
 
 import numpy as np
 import scipy
-import skimage
-from skimage.io import imread, imsave
-from skimage.transform import rescale
+try:
+    import skimage
+    from skimage.io import imread, imsave
+    from skimage.transform import rescale
+except ImportError:
+    print("Error: Package 'skimage' is needed when doing image processing. "
+          "See 'http://scikit-image.org' for details.", file=sys.stderr)
+    sys.exit(1)
 import matplotlib.pyplot as plt
 
 import mpl_setting
