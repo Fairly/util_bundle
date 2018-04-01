@@ -23,19 +23,25 @@ def to_tex_math(field_name):
 
 def panel_key_order(name):
     if name.startswith('V') or 'dV' in name:
-        return '\0' + name  # make the AP always the first panel in a figure
-    elif name.startswith('I_Na'):
-        return '\1' + name
+        return '\x00' + name  # make the AP always the first panel in a figure
+    elif name.startswith('I_Na') and not name.startswith('I_Nak') and not name.startswith('I_NaK'):
+        return '\x01' + name
     elif name.startswith('I_Ca'):
-        return '\2' + name
+        return '\x02' + name
     elif name.startswith('I_to'):
-        return '\3' + name
+        return '\x03' + name
+    elif name.startswith('I_Kur'):
+        return '\x04' + name
+    elif name.startswith('I_Kss'):
+        return '\x05' + name
     elif name.startswith('I_Kr'):
-        return '\4' + name
+        return '\x06' + name
     elif name.startswith('I_Ks'):
-        return '\5' + name
+        return '\x07' + name
     elif name.startswith('I_K'):
-        return '\6' + name
+        return '\x08' + name
+    elif name.startswith('I_f'):
+        return '\x09' + name
     else:
         return name
 
@@ -166,7 +172,7 @@ def my_plot(data, l_field_names, xlimit=None, color=None, mplsetting=False):
 
 
 def autoplot(l_input_filename, l_label=None, flags=('all',),
-             xlimit=None, outfigname=None, color=None, mplsetting=False):
+             xlimit=None, outfigname=None, color=None, mplsetting=False, max_panel_num=11):
     """
 
 
@@ -195,9 +201,9 @@ def autoplot(l_input_filename, l_label=None, flags=('all',),
 
     field_names = data[0]['l_field_names']
     if 'all' in flags:
-        if len(field_names) < 10:
+        if len(field_names) < max_panel_num:
             field_names.remove(data[0]['xaxis'])
-            my_plot(data, field_names, xlimit, color, mplsetting)
+            my_plot(data, sorted(field_names, key=panel_key_order), xlimit, color, mplsetting)
         else:
             # too many panels, separated to two figures
             field_V_and_I = sorted([f_n for f_n in field_names if
@@ -210,13 +216,18 @@ def autoplot(l_input_filename, l_label=None, flags=('all',),
             if flag in field_names:
                 l_gca.append(flag)
             else:
-                l_gca.extend([f_n for f_n in field_names if f_n.startswith(flag)])
+                if flag == 'I_Na':
+                    l_gca.extend([f_n for f_n in field_names if f_n.startswith(flag) 
+                                                                and not f_n.startswith('I_NaK') 
+                                                                and not f_n.startswith('I_Nak')])
+                else:
+                    l_gca.extend([f_n for f_n in field_names if f_n.startswith(flag)])
 
             if flag == 'V':
                 l_gca.extend([f_n for f_n in field_names if 'dV' in f_n])
 
             l_gca = list(set(l_gca))
-            if len(l_gca) >= 9:
+            if not len(l_gca) < max_panel_num:
                 my_plot(data, sorted(l_gca, key=panel_key_order), xlimit, color, mplsetting)
                 l_gca = []
 
