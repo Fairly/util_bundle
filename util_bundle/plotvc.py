@@ -30,7 +30,7 @@ import yaml
 import mpl_setting
 
 
-def plotvc(vc_yaml, start=1, end=0):
+def plotvc(vc_yaml, start=1, end=0, iftext=True):
     """
     Plot voltage traces of a voltage clamp protocol.
 
@@ -61,50 +61,51 @@ def plotvc(vc_yaml, start=1, end=0):
         plt.plot(time, voltage, 'k')
 
     ax = plt.gca()
-    # text on test voltage
-    ax.text(x=config['HOLDING_TIME'] + config['PREPULSE_TIME'] - 10,
-            y=test_v[0],
-            s='{:.0f} mV'.format(test_v[0]),
-            va='center', ha='right')
-    ax.text(x=config['HOLDING_TIME'] + config['PREPULSE_TIME'] - 10,
-            y=test_v[-1],
-            s='{:.0f} mV'.format(test_v[-1]),
-            va='center', ha='right')
-    ax.text(x=config['HOLDING_TIME'] + config['PREPULSE_TIME'] + 0.5 * config['DURATION'],
-            y=test_v[-1] + 1,
-            s='{:.0f} ms'.format(config['DURATION']),
-            va='bottom', ha='center')
-
-    # text on prepulse and postpulse
-    if config['PREPULSE_TIME'] >= 200:
-        ax.text(x=config['HOLDING_TIME'] - 10,
-                y=config['PREPULSE_V'],
-                s='{:.0f} mV'.format(config['PREPULSE_V']),
+    if iftext:
+        # text on test voltage
+        ax.text(x=config['HOLDING_TIME'] + config['PREPULSE_TIME'] - 10,
+                y=test_v[0],
+                s='{:.0f} mV'.format(test_v[0]),
                 va='center', ha='right')
-        ax.text(x=config['HOLDING_TIME'] + 0.5 * config['PREPULSE_TIME'],
-                y=config['PREPULSE_V'] + 1,
-                s='{:.0f} ms'.format(config['PREPULSE_TIME']),
-                va='bottom', ha='center')
-    if config['POSTPULSE_TIME'] >= 200:
-        ax.text(x=config['HOLDING_TIME'] + config['PREPULSE_TIME'] + config['DURATION'] + config['POSTPULSE_TIME'] + 10,
-                y=config['POSTPULSE_V'],
-                s='{:.0f} mV'.format(config['POSTPULSE_V']),
-                va='center', ha='left')
-        ax.text(x=config['HOLDING_TIME'] + config['PREPULSE_TIME'] + config['DURATION'] + 0.5 * config['POSTPULSE_TIME'],
-                y=config['POSTPULSE_V'] + 1,
-                s='{:.0f} ms'.format(config['POSTPULSE_TIME']),
+        ax.text(x=config['HOLDING_TIME'] + config['PREPULSE_TIME'] - 10,
+                y=test_v[-1],
+                s='{:.0f} mV'.format(test_v[-1]),
+                va='center', ha='right')
+        ax.text(x=config['HOLDING_TIME'] + config['PREPULSE_TIME'] + 0.5 * config['DURATION'],
+                y=test_v[-1] + 1,
+                s='{:.0f} ms'.format(config['DURATION']),
                 va='bottom', ha='center')
 
-    # text on holding and tailing
-    ax.text(x=start,
-            y=config['HOLDING_V'] + 1,
-            s='{:.0f} mV'.format(config['HOLDING_V']),
-            va='bottom', ha='left')
-    if config['TAIL_TIME'] >= 200:
-        ax.text(x=time[-1] - end,
-                y=config['TAIL_V'] + 1,
-                s='{:.0f} mV'.format(config['TAIL_V']),
-                va='bottom', ha='right')
+        # text on prepulse and postpulse
+        if config['PREPULSE_TIME'] >= 200:
+            ax.text(x=config['HOLDING_TIME'] - 10,
+                    y=config['PREPULSE_V'],
+                    s='{:.0f} mV'.format(config['PREPULSE_V']),
+                    va='center', ha='right')
+            ax.text(x=config['HOLDING_TIME'] + 0.5 * config['PREPULSE_TIME'],
+                    y=config['PREPULSE_V'] + 1,
+                    s='{:.0f} ms'.format(config['PREPULSE_TIME']),
+                    va='bottom', ha='center')
+        if config['POSTPULSE_TIME'] >= 200:
+            ax.text(x=config['HOLDING_TIME'] + config['PREPULSE_TIME'] + config['DURATION'] + config['POSTPULSE_TIME'] + 10,
+                    y=config['POSTPULSE_V'],
+                    s='{:.0f} mV'.format(config['POSTPULSE_V']),
+                    va='center', ha='left')
+            ax.text(x=config['HOLDING_TIME'] + config['PREPULSE_TIME'] + config['DURATION'] + 0.5 * config['POSTPULSE_TIME'],
+                    y=config['POSTPULSE_V'] + 1,
+                    s='{:.0f} ms'.format(config['POSTPULSE_TIME']),
+                    va='bottom', ha='center')
+
+        # text on holding and tailing
+        ax.text(x=start,
+                y=config['HOLDING_V'] + 1,
+                s='{:.0f} mV'.format(config['HOLDING_V']),
+                va='bottom', ha='left')
+        if config['TAIL_TIME'] >= 200:
+            ax.text(x=time[-1] - end,
+                    y=config['TAIL_V'] + 1,
+                    s='{:.0f} mV'.format(config['TAIL_V']),
+                    va='bottom', ha='right')
 
     # reset xlimit
     ax.set_xlim(start, time[-1] - end)

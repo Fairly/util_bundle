@@ -167,7 +167,7 @@ Arguments:
                     pass
                 else:
                     time_offset = reset_start_time - data[0][0]
-                    data['t'] += time_offset
+                    data['t'] = data['t'] + time_offset
                     save_data_file(filename, header=headers, data=data)
 
                 shutil.move(filename, tmp_file_name)
@@ -202,6 +202,10 @@ Options:
     -C=CTM      Customized plotting prefixes, separated by ','. For example,
                 "V,I" means plotting fields whose name starts with "V" or "I".
 
+    -p=pnum     Max number of panels in a single figure. Set to a big value to
+                plot all panels in one figure, or a small number to make the
+                figure clear.
+
     -c          If set, using only black color for plotting.
     -S          Using mpl_setting.py to set default matplotlib.
 
@@ -228,6 +232,7 @@ Arguments:
             '-V': bool,
             '-A': bool,
             '-C': Or(None, And(str, len)),
+            '-p': Or(None, Use(int)),
             '-c': bool,
             '-S': bool,
             '-o': Or(None, And(str, len)),
@@ -272,18 +277,23 @@ Arguments:
         else:
             color = None
 
+        if not args['-p']:
+            args['-p'] = 11  # set default panel number
+
         myplot.autoplot(args['<FILE>'], args['<LABEL>'],
                         flags=plot_flag, outfigname=args['-o'], xlimit=xlim,
-                        color=color, mplsetting=args['-S'])
+                        color=color, mplsetting=args['-S'], max_panel_num=args['-p'])
 
 
 class plotvc(AbstractCommand):
     """
-Usage:  plotvc [-s=start] [-e=end] <YAMLFILE>
+Usage:  plotvc [-n] [-s=start] [-e=end] <YAMLFILE>
 
 Options:
   -s=start    Set the start time of plotting, since the holding time is usually too long. [default: 1]
   -e=end      Set the number in multi-seconds truncated from the end. [default: 0]
+
+  -n          If set, no text will be plot.
 
 Arguments:
   <YAMLFILE>  The config file containing the voltage clamp protocol.
@@ -293,6 +303,7 @@ Arguments:
         schema = Schema({
             "-s": Use(int),
             "-e": Use(int),
+            "-n": bool,
             "<YAMLFILE>": os.path.isfile,
         }
         )
@@ -301,7 +312,7 @@ Arguments:
 
         import plotvc as pvc
         f = open(args["<YAMLFILE>"], 'r')
-        pvc.plotvc(f, start=args['-s'], end=args['-e'])
+        pvc.plotvc(f, start=args['-s'], end=args['-e'], iftext=not args['-n'])
 
 
 class freq(AbstractCommand):
@@ -901,6 +912,8 @@ Arguments:
             data_ven = _data_ven[-10001:]
 
             i_t = headers_atr.index('t')
+            data_atr = data_atr.view((data_atr.dtype[0], len(data_atr.dtype.names)))
+            data_ven = data_ven.view((data_ven.dtype[0], len(data_ven.dtype.names)))
             data_atr[:, i_t] -= data_atr[0, i_t]
             data_ven[:, i_t] -= data_ven[0, i_t]
 
@@ -1114,7 +1127,7 @@ Arguments:
 
         # do some post processing, these properties cannot be set in rcParam
         for _fig in figures:
-            _fig.tight_layout()
+            # _fig.tight_layout()
 
             for _axe in _fig.axes:
                 _axe.spines['right'].set_visible(False)
