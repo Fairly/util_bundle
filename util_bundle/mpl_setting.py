@@ -4,7 +4,7 @@ import matplotlib as mpl
 def set_matplotlib_default():
     # Matplotlib Style Sheet #
     # print mpl.rcParams.keys()
-    fontsize = 6
+    fontsize = 8
 
     mpl.rcParams['font.family'] = 'Arial'
     # mpl.rcParams['font.serif'] = 'Times, Palatino, New Century Schoolbook, Bookman, Computer Modern Roman'
@@ -28,17 +28,18 @@ def set_matplotlib_default():
     mpl.rcParams['axes.labelweight'] = 'bold'
     mpl.rcParams['axes.spines.top'] = False
     mpl.rcParams['axes.spines.right'] = False
+    mpl.rcParams['axes.linewidth'] = fontsize / 6.0
 
-    mpl.rcParams['lines.linewidth'] = 1
+    mpl.rcParams['lines.linewidth'] = fontsize / 6.0
     mpl.rcParams['lines.dash_capstyle'] = 'round'
     mpl.rcParams['lines.solid_capstyle'] = 'round'
 
     mpl.rcParams['xtick.labelsize'] = fontsize
-    mpl.rcParams['xtick.major.size'] = fontsize / 2.5
+    mpl.rcParams['xtick.major.size'] = fontsize / 3
     mpl.rcParams['xtick.major.pad'] = fontsize / 2.5
     mpl.rcParams['xtick.major.width'] = fontsize / 6.0
     mpl.rcParams['ytick.labelsize'] = fontsize
-    mpl.rcParams['ytick.major.size'] = fontsize / 2.5
+    mpl.rcParams['ytick.major.size'] = fontsize / 3
     mpl.rcParams['ytick.major.pad'] = fontsize / 2.5
     mpl.rcParams['ytick.major.width'] = fontsize / 6.0
 
@@ -52,8 +53,8 @@ def set_matplotlib_default():
 
 point = 1 / 72  # inch
 
-# Preferences for Plos Computational Biology
-fig_size = (7.5, 8.75)
+# Preferences for Plos Computational Biology (PlosCB)
+fig_size = (7.5, 8.75)  # maximum size acceptable by PlosCB
 
 if __name__ == '__main__':
     print(mpl.rcParams.keys())
