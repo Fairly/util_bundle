@@ -42,6 +42,14 @@ def panel_key_order(name):
         return '\x08' + name
     elif name.startswith('I_f'):
         return '\x09' + name
+    elif name.startswith('I_st'):
+        return '\x0a' + name
+    elif name.startswith('I_sus'):
+        return '\x0b' + name
+    elif name.startswith('I'):
+        return '\x0c' + name
+    elif name.startswith('J'):
+        return '\x0d' + name
     else:
         return name
 
@@ -172,7 +180,8 @@ def my_plot(data, l_field_names, xlimit=None, color=None, mplsetting=False):
 
 
 def autoplot(l_input_filename, l_label=None, flags=('all',),
-             xlimit=None, outfigname=None, color=None, mplsetting=False, max_panel_num=11):
+             xlimit=None, outfigname=None, color=None,
+             mplsetting=False, max_panel_num=11):
     """
 
 
@@ -183,6 +192,7 @@ def autoplot(l_input_filename, l_label=None, flags=('all',),
     :param flags:
     :param xlimit: None, tuple or a tuple of two list
     :param outfigname: If no fig name is given, no fig will be saved.
+    :param max_panel_num:
     """
     if mplsetting:
         mpl_setting.set_matplotlib_default()
@@ -199,27 +209,21 @@ def autoplot(l_input_filename, l_label=None, flags=('all',),
         max_end = max(new_end)
         xlimit = (0, max_end)
 
+    # collect fields that will be plotted
     field_names = data[0]['l_field_names']
+    l_gca = []
     if 'all' in flags:
-        if len(field_names) < max_panel_num:
-            field_names.remove(data[0]['xaxis'])
-            my_plot(data, sorted(field_names, key=panel_key_order), xlimit, color, mplsetting)
-        else:
-            # too many panels, separated to two figures
-            field_V_and_I = sorted([f_n for f_n in field_names if
-                                    'dV' in f_n or f_n.startswith('V') or f_n.startswith('I')], key=panel_key_order)
-            my_plot(data, field_V_and_I, xlimit, color, mplsetting)
-            my_plot(data, sorted(set(field_names) - set(field_V_and_I), key=panel_key_order), xlimit, color, mplsetting)
+        field_names.remove(data[0]['xaxis'])
+        l_gca.extend(field_names)
     else:
-        l_gca = []
         for flag in flags:
             if flag in field_names:
                 l_gca.append(flag)
             else:
                 if flag == 'I_Na':
-                    l_gca.extend([f_n for f_n in field_names if f_n.startswith(flag) 
-                                                                and not f_n.startswith('I_NaK') 
-                                                                and not f_n.startswith('I_Nak')])
+                    l_gca.extend([f_n for f_n in field_names
+                                  if f_n.startswith(flag) and not f_n.startswith('I_NaK')
+                                  and not f_n.startswith('I_Nak')])
                 else:
                     l_gca.extend([f_n for f_n in field_names if f_n.startswith(flag)])
 
@@ -227,13 +231,18 @@ def autoplot(l_input_filename, l_label=None, flags=('all',),
                 l_gca.extend([f_n for f_n in field_names if 'dV' in f_n])
 
             l_gca = list(set(l_gca))
-            if not len(l_gca) < max_panel_num:
-                my_plot(data, sorted(l_gca, key=panel_key_order), xlimit, color, mplsetting)
-                l_gca = []
 
-        if l_gca:
-            my_plot(data, sorted(l_gca, key=panel_key_order), xlimit, color, mplsetting)
+    # sort fields and plot
+    l_gca.sort(key=panel_key_order)
+    while len(l_gca) != 0:
+        if len(l_gca) > max_panel_num:
+            my_plot(data, l_gca[0:max_panel_num], xlimit, color, mplsetting)
+            l_gca = l_gca[max_panel_num:]
+        else:
+            my_plot(data, l_gca, xlimit, color, mplsetting)
+            l_gca = []
 
+    # output
     if outfigname is not None:
         plt.savefig(outfigname)
     else:
