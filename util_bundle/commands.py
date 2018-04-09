@@ -76,6 +76,8 @@ def clean_result_for_plot(filename, add_underline=False, truncate_to=None, shrin
                           reset_start_time=False, tail=True):  # TODO parameter `tail`
     """
     When plotting a result, it's common to reduce the size of the result file first.
+
+    :param reset_start_time: (bool, float)
     """
     from subprocess import call
     backup_file_name = filename + '.backup.dat'
@@ -99,7 +101,7 @@ def clean_result_for_plot(filename, add_underline=False, truncate_to=None, shrin
     if shrink is not None:
         _, data = read_data_file(tmp_file_name, max_rows=2)  # read only 2 data lines to speed up
         dt = dt_recognition(data)
-        multiplier = int(shrink / dt)
+        multiplier = int(round(shrink / dt))
 
         to_file = open(filename, mode="w")
         # save the first and second line, then every `multiplier`th line to file
@@ -178,7 +180,7 @@ Options:
                 pass
             else:
                 clean_result_for_plot(fname, truncate_to=truncate_num, shrink=1,
-                                      reset_start_time=True, tail=True)
+                                      reset_start_time=0, tail=True)
 
 
 class clean(AbstractCommand):
