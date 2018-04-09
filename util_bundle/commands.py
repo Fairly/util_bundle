@@ -153,12 +153,14 @@ Options:
     -t=tail     Align to the `tail`th AP from the ending. Starts from 1.
 
     -o=offset   Time retained before the first aligned AP. [default: 100]
+    -s=shrink   Shrink the data size as described in `clean` command. [default: 1]
     """
     def execute(self):
         schema = Schema({
                          '-b': Or(None, And(Use(int), lambda n: n > 0)),
                          '-t': Or(None, And(Use(int), lambda n: n > 0)),
                          '-o': Use(float),
+                         '-s': Use(float),
                          '<FILE>': Or(None, [os.path.isfile], error='Cannot find file[s].'),
                          }
                         )
@@ -179,7 +181,7 @@ Options:
             if truncate_num > len(npa_data):
                 pass
             else:
-                clean_result_for_plot(fname, truncate_to=truncate_num, shrink=1,
+                clean_result_for_plot(fname, truncate_to=truncate_num, shrink=args['-s'],
                                       reset_start_time=0, tail=True)
 
 
