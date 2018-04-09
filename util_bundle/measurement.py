@@ -53,42 +53,69 @@ def ap_recognition(data, time_prefix='t', stim_prefix='I_Stim'):
     # TODO Only support non-pacemaking cells
     time_name = ''
     stim_name = ''
+    dvdt_name = ''
     for header in data.dtype.names:
         if header.startswith(time_prefix):
             time_name = header
         elif header.startswith(stim_prefix):
             stim_name = header
-    if time_name == '' or stim_name == '':
+        elif 'dvdt' in header.lower():
+            dvdt_name = header
+    if time_name == '' or (stim_name == '' and dvdt_name == ''):
         raise DataError("Cannot extract BCL or dt "
                         "please check 'stimulus' is in the data file.")
 
     i_t = data.dtype.names.index(time_name)
     i_i_stim = data.dtype.names.index(stim_name)
 
-    # find all stimuli
-    l_stim = []
-    for i, row in enumerate(data):
-        if row[i_i_stim] != 0 and (i == 0 or data[i - 1][i_i_stim] == 0):
-            # spot a stimulus
-            if i == len(data) - 1:
-                # if there is something wrong in applying stimuli in the cell model,
-                # an extra stimulus may appear at the end of data.
-                # ignore this.
-                continue
+    start_points = []  # of APs
+    if max(data[stim_name]) > 0.0001:  # has stimulus
+        # find all stimuli
+        for i, row in enumerate(data):
+            if row[i_i_stim] != 0 and (i == 0 or data[i - 1][i_i_stim] == 0):
+                # spot a stimulus
+                if i == len(data) - 1:
+                    # if there is something wrong in applying stimuli in the cell model,
+                    # an extra stimulus may appear at the end of data.
+                    # ignore this.
+                    continue
 
-            if row[i_t] == 1:
-                # although the starting time of a model running is 1,
-                # the stimulus should be from 0
-                l_stim.append(0.0)
-            else:
-                l_stim.append(row[i_t])
+                if row[i_t] == 1:
+                    # although the starting time of a model running is 1,
+                    # the stimulus should be from 0
+                    start_points.append(0.0)
+                else:
+                    start_points.append(row[i_t])
+    else:  # no stimulus, probably pace-making cells
+        dvdt_data = data[dvdt_name]
+
+        max_dvdt = -10000
+        start_flag = False  # mark for a start of AP
+        end_flag = False  # mark after get the max of dvdt
+        for i in range(len(dvdt_data)):
+            if not start_flag and not end_flag:
+                if dvdt_data[i] > 10:
+                    start_flag = True
+
+            if start_flag and not end_flag:
+                if dvdt_data[i] > max_dvdt:
+                    max_dvdt = dvdt_data[i]
+                elif dvdt_data[i] < max_dvdt:
+                    start_points.append(data[i][i_t])
+                    end_flag = True
+
+            if start_flag and end_flag:
+                if dvdt_data[i] < 5:
+                    start_flag = False
+                    end_flag = False
+                    max_dvdt = -10000
 
     l_ap = []
-    for i, stim in enumerate(l_stim):
-        if i == len(l_stim) - 1:
-            l_ap.append((stim, len(data) - stim))
+    for i, stim in enumerate(start_points):
+        if i == len(start_points) - 1:
+            l_ap.append((stim, data[-1][i_t] - stim))
         else:
-            l_ap.append((stim, l_stim[i + 1] - stim))
+            l_ap.append((stim, start_points[i + 1] - stim))
 
     return l_ap
 
