@@ -13,7 +13,9 @@ Command:
   burst         Do simulation using the burst pacing protocol.
 
   clean         Clean a result file for plotting.
+  align         Align data in results for reasonable comparison.
   measure       Calculate characteristics of APs from results of cell models.
+
   qplot         Plot AP or current traces by a simple script.
   plot          Plot figures.
   plotvc        Plot the curve of voltage clamp protocol.

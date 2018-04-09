@@ -72,6 +72,115 @@ Arguments:
                 measurement.measure(f)
 
 
+def clean_result_for_plot(filename, add_underline=False, truncate_to=None, shrink=None,
+                          reset_start_time=False, tail=True):  # TODO parameter `tail`
+    """
+    When plotting a result, it's common to reduce the size of the result file first.
+    """
+    from subprocess import call
+    backup_file_name = filename + '.backup.dat'
+    tmp_file_name = 'tmp.dat'
+
+    shutil.copyfile(filename, backup_file_name)  # backup
+    shutil.move(filename, tmp_file_name)
+
+    if truncate_to is not None:
+        # use shell command is usually faster than python itself
+        to_file = open(filename, mode="w")
+        call(['head', '-n', '1', tmp_file_name], stdout=to_file)
+        to_file.close()
+
+        to_file = open(filename, mode="a")
+        call(['tail', '-n', str(truncate_to), tmp_file_name], stdout=to_file)
+        to_file.close()
+
+        shutil.move(filename, tmp_file_name)
+
+    if shrink is not None:
+        _, data = read_data_file(tmp_file_name, max_rows=2)  # read only 2 data lines to speed up
+        dt = dt_recognition(data)
+        multiplier = int(shrink / dt)
+
+        to_file = open(filename, mode="w")
+        # save the first and second line, then every `multiplier`th line to file
+        call(['awk', 'NR == 1 || NR ==2 || (NR-2) % ' + str(multiplier) + ' == 0', tmp_file_name],
+             stdout=to_file)
+        to_file.close()
+
+        shutil.move(filename, tmp_file_name)
+
+    if add_underline:
+        headers, _ = read_data_file(tmp_file_name, max_rows=2)  # read only 2 data lines to speed up
+
+        if not headers[0].endswith('_'):
+            for i, tag in enumerate(headers):
+                headers[i] = tag + '_'
+
+            # these code seems cumbersome, but fast!
+            from_file = open(tmp_file_name)
+            from_file.readline()
+            to_file = open(filename, mode="w")
+            to_file.write('\t'.join(headers))
+            shutil.copyfileobj(from_file, to_file)
+
+            shutil.move(filename, tmp_file_name)
+
+    if reset_start_time is not None:
+        headers, data = read_data_file(tmp_file_name)
+        if data[0][0] == reset_start_time:  # don't need to reset
+            pass
+        else:
+            time_offset = reset_start_time - data[0][0]
+            data['t'] = data['t'] + time_offset
+            save_data_file(filename, header=headers, data=data)
+
+        shutil.move(filename, tmp_file_name)
+
+    # all operations done
+    shutil.move(tmp_file_name, filename)
+
+
+class align(AbstractCommand):
+    """
+usage: align [options] (-b=head | -t=tail) <FILE>...
+
+Align APs in several result files to allow reasonable comparison.
+
+Options:
+    -b=head     Align to the `head`th AP from the beginning. Starts from 1.
+    -t=tail     Align to the `tail`th AP from the ending. Starts from 1.
+
+    -o=offset   Time retained before the first aligned AP. [default: 100]
+    """
+    def execute(self):
+        schema = Schema({
+                         '-b': Or(None, And(Use(int), lambda n: n > 0)),
+                         '-t': Or(None, And(Use(int), lambda n: n > 0)),
+                         '-o': Use(float),
+                         '<FILE>': Or(None, [os.path.isfile], error='Cannot find file[s].'),
+                         }
+                        )
+        args = schema.validate(self.args)
+
+        for fname in args['<FILE>']:
+            l_labels, npa_data = read_data_file(fname)
+
+            APs = measurement.ap_recognition(npa_data)
+            dt = measurement.dt_recognition(npa_data)
+
+            truncate_num = 1000000000
+            if args['-b']:
+                truncate_num = len(npa_data) - int((APs[args['-b']][0] - args['-o']) / dt)
+            elif args['-t']:
+                truncate_num = len(npa_data) - int((APs[-args['-t']][0] - args['-o']) / dt)
+
+            if truncate_num > len(npa_data):
+                pass
+            else:
+                clean_result_for_plot(fname, truncate_to=truncate_num, shrink=1,
+                                      reset_start_time=True, tail=True)
+
+
 class clean(AbstractCommand):
     """
 usage: clean [options] <FILE>...
@@ -107,73 +216,6 @@ Arguments:
                         )
 
         args = schema.validate(self.args)
-
-        def clean_result_for_plot(filename, add_underline=False, truncate_to=None, shrink=None,
-                                  reset_start_time=False, tail=True):  # TODO parameter `tail`
-            """
-            When plotting a result, it's common to reduce the size of the result file first.
-            """
-            from subprocess import call
-            backup_file_name = filename + '.backup.dat'
-            tmp_file_name = 'tmp.dat'
-
-            shutil.copyfile(filename, backup_file_name)  # backup
-            shutil.move(filename, tmp_file_name)
-
-            if truncate_to is not None:
-                # use shell command is usually faster than python itself
-                to_file = open(filename, mode="w")
-                call(['head', '-n', '1', tmp_file_name], stdout=to_file)
-                to_file.close()
-
-                to_file = open(filename, mode="a")
-                call(['tail', '-n', str(truncate_to), tmp_file_name], stdout=to_file)
-                to_file.close()
-
-                shutil.move(filename, tmp_file_name)
-
-            if shrink is not None:
-                _, data = read_data_file(tmp_file_name, max_rows=2)  # read only 2 data lines to speed up
-                dt = dt_recognition(data)
-                multiplier = int(shrink / dt)
-
-                to_file = open(filename, mode="w")
-                # save the first and second line, then every `multiplier`th line to file
-                call(['awk', 'NR == 1 || NR ==2 || (NR-2) % ' + str(multiplier) + ' == 0', tmp_file_name],
-                     stdout=to_file)
-                to_file.close()
-
-                shutil.move(filename, tmp_file_name)
-
-            if add_underline:
-                headers, _ = read_data_file(tmp_file_name, max_rows=2)  # read only 2 data lines to speed up
-
-                if not headers[0].endswith('_'):
-                    for i, tag in enumerate(headers):
-                        headers[i] = tag + '_'
-
-                    # these code seems cumbersome, but fast!
-                    from_file = open(tmp_file_name)
-                    from_file.readline()
-                    to_file = open(filename, mode="w")
-                    to_file.write('\t'.join(headers))
-                    shutil.copyfileobj(from_file, to_file)
-
-                    shutil.move(filename, tmp_file_name)
-
-            if reset_start_time is not None:
-                headers, data = read_data_file(tmp_file_name)
-                if data[0][0] == reset_start_time:  # don't need to reset
-                    pass
-                else:
-                    time_offset = reset_start_time - data[0][0]
-                    data['t'] = data['t'] + time_offset
-                    save_data_file(filename, header=headers, data=data)
-
-                shutil.move(filename, tmp_file_name)
-
-            # all operations done
-            shutil.move(tmp_file_name, filename)
 
         if args['--recover']:
             for f in args['<BACKUPFILE>']:
