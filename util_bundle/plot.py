@@ -164,10 +164,11 @@ def my_plot(data, l_field_names, xlimit=None, color=None, mplsetting=False):
         if column_name == 'V_m':
             ylabel_name += ' (mV)'
         elif 'dV' in column_name:
-            ylabel_name += ' (mV/ms)'
+            ylabel_name = '${\\rm d}V/{\\rm d}t$ (mV/ms)'
         elif column_name.startswith('I'):
             ylabel_name += ' (pA/pF)'
         axe.set_ylabel(ylabel_name)
+        axe.set_xlabel('Time (ms)')
 
         if xlimit is not None:
             axe.set_xlim(*xlimit)
