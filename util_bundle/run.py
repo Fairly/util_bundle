@@ -4,14 +4,7 @@ Usage:
     run.py <command> [<args>...]
     run.py -h
 
-Control the running of the cell model. Do simulations automatically.
-
 Command:
-  run           Do experiments according to different BCLs.
-  freq          Do experiments according to different frequencies.
-  s1s2          Do simulation using s1s2 protocols.
-  burst         Do simulation using the burst pacing protocol.
-
   clean         Clean a result file for plotting.
   align         Align data in results for reasonable comparison.
   measure       Calculate characteristics of APs from results of cell models.
@@ -20,8 +13,10 @@ Command:
   plot          Plot figures.
   plotvc        Plot the curve of voltage clamp protocol.
 
-  con3d        Do 3D geometry construction.
-  prep         Pre-process original images.
+  equa          Generate Latex equations from C code.
+
+  con3d         Do 3D geometry construction.
+  prep          Pre-process original images.
 
 Options:
   -h, --help    Print the help message.
