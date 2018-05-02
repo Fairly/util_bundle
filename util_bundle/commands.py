@@ -3,6 +3,7 @@ import shutil
 from concurrent.futures import ThreadPoolExecutor
 from multiprocessing import cpu_count
 from subprocess import call
+import re
 
 from docopt import docopt
 from schema import Schema, Or, Use, And
@@ -142,6 +143,144 @@ def clean_result_for_plot(filename, add_underline=False, truncate_to=None, shrin
     shutil.move(tmp_file_name, filename)
 
 
+class equa(AbstractCommand):
+    """
+usage: equa [options] <FILE>...
+
+Options:
+    """
+    @staticmethod
+    def changebrace(s):
+        rs = list(s)
+        rs[0] = '{'
+        nest_tier = 0
+        for i in range(1, len(rs)):
+            if rs[i] == '(':
+                nest_tier += 1
+            elif rs[i] == ')':
+                if nest_tier > 0:
+                    nest_tier -= 1
+                else:
+                    rs[i] = '}'
+                    break
+        return ''.join(rs)
+    
+    @staticmethod
+    def countleft(s):
+        rtn_len = 0
+        if s[-2] == ')':
+            s = s[:-1]
+            nest_tier = 0
+            for i in range(len(s)-1, 0, -1):
+                rtn_len += 1
+                if s[i] == ')':
+                    nest_tier += 1
+                elif s[i] == '(':
+                    nest_tier -= 1
+                    if nest_tier <= 0:
+                        break
+        else:
+            p = re.compile(r'(?<=[^\w.])([\w.{}\\]+)(?=/)')
+            m = re.search(p, s)
+            rtn_len = len(m.group())
+        return rtn_len
+        
+    @staticmethod
+    def countright(s):
+        rtn_len = 0
+        if s[1] == '(':
+            nest_tier = 0
+            for i in range(len(s)):
+                rtn_len += 1
+                if s[i] == '(':
+                    nest_tier += 1
+                elif s[i] == ')':
+                    nest_tier -= 1
+                    if nest_tier <= 0:
+                        break
+        else:
+            p = re.compile(r'(?<=/)([\w.{}\\]+)(?=[^\w.]?)')
+            m = re.search(p, s)
+            rtn_len = len(m.group())
+        return rtn_len
+
+    def execute(self):
+        schema = Schema({
+            '<FILE>': Or(None, [os.path.isfile], error='Cannot find file[s].'),
+        }
+        )
+        args = schema.validate(self.args)
+
+        for filename in args['<FILE>']:
+            fin = open(filename, 'r')
+            fout = open(filename+'.tex', 'w')
+
+            for line in fin:
+                line = line.strip('\n')
+                if len(line) == 0:
+                    print('', file=fout)
+                    continue
+                if line[0] == '%':
+                    print(line, file=fout)
+                    continue
+
+                # clean
+                line = re.sub(r';$', '', line)
+                line = re.sub(r'^double ', '', line)
+                line = re.sub(r'^float ', '', line)
+                line = re.sub(r'^int ', '', line)
+                line = line.replace(' ', '')
+
+                # deal with fractions
+                pos = 0
+                while True:
+                    start = line.find('/', pos)
+                    if start == -1:
+                        break
+
+                    pos = start + 1
+                    div_left = self.countleft(line[:start+1])
+                    div_right = self.countright(line[start:])
+
+                    if div_left > 20 or div_right > 20:
+                        numerator = line[start-div_left:start]
+                        if numerator[0] == '(' and numerator[-1] == ')':
+                            numerator = numerator[1:-1]
+                        denominator = line[start+1:start+div_right]
+                        if denominator[0] == '(' and denominator[-1] == ')':
+                            denominator = denominator[1:-1]
+                        frac = r'\frac {' + numerator + '}{' + denominator + '}'
+                        line = line[:start-div_left] + frac + line[start+div_right:]
+
+                # deal with functions
+                while line.find('exp') != -1:
+                    start = line.find('exp')
+                    if line[start+3] == '(':
+                        line = line[:start+3] + self.changebrace(line[start+3:])
+                    line = line.replace('exp', 'e^', 1)
+
+                # deal with subscripts
+                p = re.compile('(?<=_)([\w]+)(?=[\W_]?)')
+                line = re.sub(p, r'{\1}', line)
+
+                # symbol replacement
+                line = line.replace('tau', '\\tau ')
+                line = line.replace('inf', '\\infty ')
+                line = line.replace('*', '\\times ')
+                line = line.replace('alpha', '\\alpha ')
+                line = line.replace('beta', '\\beta ')
+                line = line.replace('gamma', '\\gamma ')
+                line = line.replace('delta', '\\delta ')
+
+                # scientific notation
+                line = re.sub(r'([0-9.]+)([Ee])(-?[0-9.])', r'\1\\times 10^{\3}', line)
+
+                print(r'\[' + line + r'\]', file=fout)
+
+            fin.close()
+            fout.close()
+
+
 class align(AbstractCommand):
     """
 usage: align [options] (-b=head | -t=tail) <FILE>...
@@ -155,15 +294,16 @@ Options:
     -o=offset   Time retained before the first aligned AP. [default: 100]
     -s=shrink   Shrink the data size as described in `clean` command. [default: 1]
     """
+
     def execute(self):
         schema = Schema({
-                         '-b': Or(None, And(Use(int), lambda n: n > 0)),
-                         '-t': Or(None, And(Use(int), lambda n: n > 0)),
-                         '-o': Use(float),
-                         '-s': Use(float),
-                         '<FILE>': Or(None, [os.path.isfile], error='Cannot find file[s].'),
-                         }
-                        )
+            '-b': Or(None, And(Use(int), lambda n: n > 0)),
+            '-t': Or(None, And(Use(int), lambda n: n > 0)),
+            '-o': Use(float),
+            '-s': Use(float),
+            '<FILE>': Or(None, [os.path.isfile], error='Cannot find file[s].'),
+        }
+        )
         args = schema.validate(self.args)
 
         for fname in args['<FILE>']:
