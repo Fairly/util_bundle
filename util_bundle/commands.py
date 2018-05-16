@@ -149,8 +149,14 @@ usage: equa [options] <FILE>...
 
 Options:
     """
+    re_fnum = r'(-?\d+(\.\d+)?)([Ee]-?\d+(\.\d+)?)?'  # floating point number in C
+
     @staticmethod
     def changebrace(s):
+        """
+        Change parentheses operators in C to braces in Latex.
+        :param s: a string starting with '(' and has its matching ')'.
+        """
         rs = list(s)
         rs[0] = '{'
         nest_tier = 0
@@ -167,6 +173,9 @@ Options:
     
     @staticmethod
     def countleft(s):
+        """
+        Count characters of the numerator on the left of the '/' operator
+        """
         rtn_len = 0
         if s[-2] == ')':
             s = s[:-1]
@@ -178,9 +187,16 @@ Options:
                 elif s[i] == '(':
                     nest_tier -= 1
                     if nest_tier <= 0:
+                        # already found the matching parenthesis. But if this pair of parentheses
+                        # means a function call, should look left further to add the length of
+                        # the function name into the count.
+                        i -= 1
+                        while i >= 0 and re.match(r'\w', s[i]) is not None:
+                            rtn_len += 1
+                            i -= 1
                         break
         else:
-            p = re.compile(r'(?<=[^\w.])([\w.{}\\]+)(?=/)')
+            p = re.compile(r'(?<=[^\w.])([\w.{}\\-]+)(?=/)')
             m = re.search(p, s)
             rtn_len = len(m.group())
         return rtn_len
@@ -199,7 +215,7 @@ Options:
                     if nest_tier <= 0:
                         break
         else:
-            p = re.compile(r'(?<=/)([\w.{}\\]+)(?=[^\w.]?)')
+            p = re.compile(r'(?<=/)([\w.{}\\-]+)(?=[^\w.]?)')
             m = re.search(p, s)
             rtn_len = len(m.group())
         return rtn_len
@@ -216,7 +232,8 @@ Options:
             fout = open(filename+'.tex', 'w')
 
             for line in fin:
-                line = line.strip('\n')
+                line = re.sub(r'//.*', '', line)
+                line = line.strip()
                 if len(line) == 0:
                     print('', file=fout)
                     continue
@@ -246,9 +263,11 @@ Options:
                         numerator = line[start-div_left:start]
                         if numerator[0] == '(' and numerator[-1] == ')':
                             numerator = numerator[1:-1]
+
                         denominator = line[start+1:start+div_right]
                         if denominator[0] == '(' and denominator[-1] == ')':
                             denominator = denominator[1:-1]
+
                         frac = r'\frac {' + numerator + '}{' + denominator + '}'
                         line = line[:start-div_left] + frac + line[start+div_right:]
 
@@ -263,17 +282,28 @@ Options:
                 p = re.compile('(?<=_)([\w]+)(?=[\W_]?)')
                 line = re.sub(p, r'{\1}', line)
 
+                # deal with '*' operators, try to remove redundant '*'
+                lp = re.compile(self.re_fnum + r'\s*\Z')
+                rp = re.compile(r'\A\s*' + self.re_fnum)
+                while line.find('*') != -1:
+                    pos = line.find('*')
+                    lm = re.search(lp, line[:pos])  # check left, if is a C number
+                    rm = re.search(rp, line[pos+1:])  # check right, if is not a C number
+                    if lm is not None and rm is None and not line[pos+1:].startswith(r'\frac'):
+                        line = line.replace('*', '', 1)  # remove this redundant '*'
+                    else:
+                        line = line.replace('*', '\\times ', 1)
+
                 # symbol replacement
                 line = line.replace('tau', '\\tau ')
                 line = line.replace('inf', '\\infty ')
-                line = line.replace('*', '\\times ')
                 line = line.replace('alpha', '\\alpha ')
                 line = line.replace('beta', '\\beta ')
                 line = line.replace('gamma', '\\gamma ')
                 line = line.replace('delta', '\\delta ')
 
                 # scientific notation
-                line = re.sub(r'([0-9.]+)([Ee])(-?[0-9.])', r'\1\\times 10^{\3}', line)
+                line = re.sub(r'(-?\d+(\.\d+)?)([Ee])(-?\d+(\.\d+)?)', r'\1\\times 10^{\4}', line)
 
                 print(r'\[' + line + r'\]', file=fout)
 
