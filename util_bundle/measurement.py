@@ -94,7 +94,7 @@ def ap_recognition(data, time_prefix='t', stim_prefix='I_Stim'):
         end_flag = False  # mark after get the max of dvdt
         for i in range(len(dvdt_data)):
             if not start_flag and not end_flag:
-                if dvdt_data[i] > 10:
+                if dvdt_data[i] > 2:
                     start_flag = True
 
             if start_flag and not end_flag:
@@ -105,7 +105,7 @@ def ap_recognition(data, time_prefix='t', stim_prefix='I_Stim'):
                     end_flag = True
 
             if start_flag and end_flag:
-                if dvdt_data[i] < 5:
+                if dvdt_data[i] < 1:
                     start_flag = False
                     end_flag = False
                     max_dvdt = -10000
