@@ -105,9 +105,15 @@ def clean_result_for_plot(filename, add_underline=False, truncate_to=None, shrin
         multiplier = int(round(shrink / dt))
 
         to_file = open(filename, mode="w")
-        # save the first and second line, then every `multiplier`th line to file
-        call(['awk', 'NR == 1 || NR ==2 || (NR-2) % ' + str(multiplier) + ' == 0', tmp_file_name],
-             stdout=to_file)
+        import platform
+        if platform.system() == 'Windows':
+            for i, line in enumerate(open(tmp_file_name, 'r')):
+                if i == 0 or (i-1) % multiplier == 0:
+                    print(line, file=to_file)
+        else:
+            # save the first and second line, then every `multiplier`th line to file
+            call(['awk', 'NR == 1 || NR ==2 || (NR-2) % ' + str(multiplier) + ' == 0', tmp_file_name],
+                 stdout=to_file)
         to_file.close()
 
         shutil.move(filename, tmp_file_name)
@@ -322,7 +328,7 @@ Options:
     -t=tail     Align to the `tail`th AP from the ending. Starts from 1.
 
     -o=offset   Time retained before the first aligned AP. [default: 100]
-    -s=shrink   Shrink the data size as described in `clean` command. [default: 1]
+    -s=shrink   Shrink the data size as described in `clean` command.
     """
 
     def execute(self):
@@ -330,7 +336,7 @@ Options:
             '-b': Or(None, And(Use(int), lambda n: n > 0)),
             '-t': Or(None, And(Use(int), lambda n: n > 0)),
             '-o': Use(float),
-            '-s': Use(float),
+            '-s': Or(None, Use(float)),
             '<FILE>': Or(None, [os.path.isfile], error='Cannot find file[s].'),
         }
         )
@@ -351,8 +357,11 @@ Options:
             if truncate_num > len(npa_data):
                 pass
             else:
-                clean_result_for_plot(fname, truncate_to=truncate_num, shrink=args['-s'],
+                if args['-s']:
+                    clean_result_for_plot(fname, truncate_to=truncate_num, shrink=args['-s'],
                                       reset_start_time=0, tail=True)
+                else:
+                    clean_result_for_plot(fname, truncate_to=truncate_num, reset_start_time=0, tail=True)
 
 
 class clean(AbstractCommand):
