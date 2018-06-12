@@ -426,6 +426,8 @@ Options:
     -A          Trigger for whether plotting all fields.
     -C=CTM      Customized plotting prefixes, separated by ','. For example,
                 "V,I" means plotting fields whose name starts with "V" or "I".
+                Also supports the use of '!' before a field name to remove fields from plotting.
+                "!I_Ca" means not plotting fields starts with "I_Ca".
 
     -p=pnum     Max number of panels in a single figure. Set to a big value to
                 plot all panels in one figure, or a small number to make the

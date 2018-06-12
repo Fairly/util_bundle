@@ -24,9 +24,9 @@ def to_tex_math(field_name):
 def panel_key_order(name):
     if name.startswith('V') or 'dV' in name:
         return '\x00' + name  # make the AP always the first panel in a figure
-    elif name.startswith('I_Na') and not name.startswith('I_Nak') and not name.startswith('I_NaK'):
+    elif name.startswith('I_Na') and not name.startswith('I_Nak') and not name.startswith('I_NaK') and not name.startswith('I_Nab'):
         return '\x01' + name
-    elif name.startswith('I_Ca'):
+    elif name.startswith('I_Ca') and not name.startswith('I_Cab'):
         return '\x02' + name
     elif name.startswith('I_to'):
         return '\x03' + name
@@ -38,7 +38,7 @@ def panel_key_order(name):
         return '\x06' + name
     elif name.startswith('I_Ks'):
         return '\x07' + name
-    elif name.startswith('I_K'):
+    elif name.startswith('I_K') and not name.startswith('I_Kb'):
         return '\x08' + name
     elif name.startswith('I_f'):
         return '\x09' + name
@@ -212,29 +212,40 @@ def autoplot(l_input_filename, l_label=None, flags=('all',),
 
     # collect fields that will be plotted
     field_names = data[0]['l_field_names']
-    l_gca = []
+    l_gca = set()
     if 'all' in flags:
         field_names.remove(data[0]['xaxis'])
-        l_gca.extend(field_names)
+        l_gca = set(field_names)
     else:
         for flag in flags:
-            if flag in field_names:
-                l_gca.append(flag)
+            targets = set()
+            if flag.startswith('!'):
+                removeflag = True
+                flag = flag[1:]
             else:
-                if flag == 'I_Na':
-                    l_gca.extend([f_n for f_n in field_names
-                                  if f_n.startswith(flag) and not f_n.startswith('I_NaK')
-                                  and not f_n.startswith('I_Nak')])
-                else:
-                    l_gca.extend([f_n for f_n in field_names if f_n.startswith(flag)])
+                removeflag = False
+
+            if flag in field_names:
+                targets.add(flag)
+            else:
+                targets = set([f_n for f_n in field_names if f_n.startswith(flag)])
+                if flag == 'I_Na':  # special case for I_Na, ignore I_NaK
+                    targets.discard('I_NaK')
+                    targets.discard('I_Nak')
 
             if flag == 'V':
-                l_gca.extend([f_n for f_n in field_names if 'dV' in f_n])
+                targets |= set([f_n for f_n in field_names if 'dV' in f_n])
 
-            l_gca = list(set(l_gca))
+            if removeflag:
+                l_gca -= targets
+            else:
+                l_gca |= targets
 
-    # sort fields and plot
+    # sort fields
+    l_gca = list(l_gca)
     l_gca.sort(key=panel_key_order)
+
+    # plot
     while len(l_gca) != 0:
         if len(l_gca) > max_panel_num:
             my_plot(data, l_gca[0:max_panel_num], xlimit, color, mplsetting)
