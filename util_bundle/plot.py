@@ -133,6 +133,7 @@ def my_plot(data, l_field_names, xlimit=None, color=None, mplsetting=False):
         fig = plt.figure(figsize=[mpl_setting.fig_size[0] / 2, mpl_setting.fig_size[1] / 4])
     else:
         fig = plt.figure()
+        plt.subplots_adjust(left=0.1, right=0.95, top=0.95, bottom=0.1, wspace=0.21, hspace=0.21)
 
     num_of_axes = len(l_field_names)
     r, c = get_axes_num(num_of_axes)
@@ -182,7 +183,7 @@ def my_plot(data, l_field_names, xlimit=None, color=None, mplsetting=False):
 
 def autoplot(l_input_filename, l_label=None, flags=('all',),
              xlimit=None, outfigname=None, color=None,
-             mplsetting=False, max_panel_num=11):
+             mplsetting=False, max_panel_num=12):
     """
 
 

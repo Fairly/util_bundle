@@ -431,7 +431,7 @@ Options:
 
     -p=pnum     Max number of panels in a single figure. Set to a big value to
                 plot all panels in one figure, or a small number to make the
-                figure clear.
+                figure clear. [default: 12]
 
     -c          If set, using only black color for plotting.
     -S          Using mpl_setting.py to set default matplotlib.
@@ -503,9 +503,6 @@ Arguments:
             color = 'k'
         else:
             color = None
-
-        if not args['-p']:
-            args['-p'] = 11  # set default panel number
 
         myplot.autoplot(args['<FILE>'], args['<LABEL>'],
                         flags=plot_flag, outfigname=args['-o'], xlimit=xlim,
