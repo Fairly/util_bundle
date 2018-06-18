@@ -39,10 +39,13 @@ class AbstractCommand:
 
 class measure(AbstractCommand):
     """
-usage:  measure    [-m] (-d=DIR | <FILE>...)
+usage:  measure    [-m] [-t=celltype] (-d=DIR | <FILE>...)
 
 Options:
     -m          Open multi-processing.
+    -t=celltype
+                Set the cell type you are measuring to 'p' for pacemaker or 'n' for non-pacemaker.
+                [default: n]
     -d=DIR      Process all files written by cell models under DIR.
 Arguments:
     <FILE>...   Files to be processed.
@@ -52,6 +55,7 @@ Arguments:
         schema = Schema({
             '-d': Or(None, os.path.isdir),
             '-m': bool,
+            '-t': Use(str),
             '<FILE>': Or(None, [os.path.isfile], error='Cannot find file[s].'),
         }
         )
@@ -66,11 +70,11 @@ Arguments:
                          if os.path.isfile(os.path.join(args['-d'], f))]
             current_files = [f for f in onlyfiles if 'currents' in f]
 
-            p.map(measurement.measure, current_files)
+            p.map(measurement.measure, current_files, args['-t'])
         else:
             # given a list of files
             for f in args['<FILE>']:
-                measurement.measure(f)
+                measurement.measure(f, args['-t'])
 
 
 def clean_result_for_plot(filename, add_underline=False, truncate_to=None, shrink=None,
