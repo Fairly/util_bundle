@@ -385,7 +385,7 @@ def find_fields(data, infilename):
             time_name = header
         elif header.startswith('V_m') or header == 'V':
             voltage_name = header
-        elif 'dvdt' in header:
+        elif 'dvdt' in header.lower():
             dvdt_name = header
         elif header.startswith('Ca_i'):
             cai_name = header
