@@ -113,7 +113,7 @@ def clean_result_for_plot(filename, add_underline=False, truncate_to=None, shrin
         if platform.system() == 'Windows':
             for i, line in enumerate(open(tmp_file_name, 'r')):
                 if i == 0 or (i-1) % multiplier == 0:
-                    print(line, file=to_file)
+                    print(line.strip(), file=to_file)
         else:
             # save the first and second line, then every `multiplier`th line to file
             call(['awk', 'NR == 1 || NR ==2 || (NR-2) % ' + str(multiplier) + ' == 0', tmp_file_name],
@@ -370,10 +370,14 @@ Options:
 
 class clean(AbstractCommand):
     """
-usage: clean [options] <FILE>...
+usage: clean rmbackup <DIR>
        clean -R <BACKUPFILE>...
+       clean [options] <FILE>...
 
 Clean the data file. Original file will be backed up.
+
+Commands:
+    rmbackup    Recursively remove all backup data files in a given <DIR>.
 
 Options:
     -t=num, --truncate=num
@@ -389,16 +393,27 @@ Options:
 Arguments:
     <FILE>...          Files to be processed.
     <BACKUPFILE>...    Names of backup files.
+    <DIR>              A directory.
     """
 
+    def remove_backup(self, path):
+        for name in os.listdir(path):
+            if os.path.isdir(name):
+                self.remove_backup(name)
+            else:
+                if name.endswith('backup.dat'):
+                    os.remove(os.path.join(path, name))
+
     def execute(self):
-        schema = Schema({'--reset-time': Or(None, Use(float)),
+        schema = Schema({'rmbackup': bool,
+                         '--reset-time': Or(None, Use(float)),
                          '--truncate': Or(None, Use(int)),
                          '--shrink': Or(None, Use(float)),
                          '--underline': bool,
                          '--recover': bool,
-                         '<FILE>': Or(None, [os.path.isfile], error='Cannot find file[s].'),
-                         '<BACKUPFILE>': Or(None, [os.path.isfile], error='Cannot find file[s].'),
+                         '<FILE>': Or(None, [os.path.isfile]),
+                         '<BACKUPFILE>': Or(None, [os.path.isfile]),
+                         '<DIR>': Or(None, os.path.isdir),
                          }
                         )
 
@@ -408,6 +423,8 @@ Arguments:
             for f in args['<BACKUPFILE>']:
                 original_file = f.replace('.backup.dat', '')
                 shutil.move(f, original_file)
+        elif args['rmbackup']:
+            self.remove_backup(args['<DIR>'])
         else:
             for f in args['<FILE>']:
                 clean_result_for_plot(f, add_underline=args['--underline'],
