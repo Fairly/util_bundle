@@ -214,6 +214,7 @@ def autoplot(l_input_filename, l_label=None, flags=('all',),
     # collect fields that will be plotted
     field_names = data[0]['l_field_names']
     l_gca = set()
+    l_remove = set()
     if 'all' in flags:
         field_names.remove(data[0]['xaxis'])
         l_gca = set(field_names)
@@ -238,9 +239,11 @@ def autoplot(l_input_filename, l_label=None, flags=('all',),
                 targets |= set([f_n for f_n in field_names if 'dV' in f_n])
 
             if removeflag:
-                l_gca -= targets
+                l_remove |= targets
             else:
                 l_gca |= targets
+
+        l_gca -= l_remove
 
     # sort fields
     l_gca = list(l_gca)
