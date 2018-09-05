@@ -92,35 +92,45 @@ def clean_result_for_plot(filename, add_underline=False, truncate_to=None, shrin
     shutil.move(filename, tmp_file_name)
 
     if truncate_to is not None:
-        # use shell command is usually faster than python itself
-        to_file = open(filename, mode="w")
-        call(['head', '-n', '1', tmp_file_name], stdout=to_file)
-        to_file.close()
+        f = open(tmp_file_name, 'r')
+        i = len(f.readlines())
+        f.close()
 
-        to_file = open(filename, mode="a")
-        call(['tail', '-n', str(truncate_to), tmp_file_name], stdout=to_file)
-        to_file.close()
+        if truncate_to >= i - 1:  # header in the first line, so minus 1 here
+            pass
+        else:
+            # use shell command is usually faster than python itself
+            to_file = open(filename, mode="w")
+            call(['head', '-n', '1', tmp_file_name], stdout=to_file)
+            to_file.close()
 
-        shutil.move(filename, tmp_file_name)
+            to_file = open(filename, mode="a")
+            call(['tail', '-n', str(truncate_to), tmp_file_name], stdout=to_file)
+            to_file.close()
+
+            shutil.move(filename, tmp_file_name)
 
     if shrink is not None:
         _, data = read_data_file(tmp_file_name, max_rows=2)  # read only 2 data lines to speed up
         dt = dt_recognition(data)
         multiplier = int(round(shrink / dt))
 
-        to_file = open(filename, mode="w")
-        import platform
-        if platform.system() == 'Windows':
-            for i, line in enumerate(open(tmp_file_name, 'r')):
-                if i == 0 or (i-1) % multiplier == 0:
-                    print(line.strip(), file=to_file)
+        if multiplier - 1.0 < 1e-6:
+            pass
         else:
-            # save the first and second line, then every `multiplier`th line to file
-            call(['awk', 'NR == 1 || NR ==2 || (NR-2) % ' + str(multiplier) + ' == 0', tmp_file_name],
-                 stdout=to_file)
-        to_file.close()
+            to_file = open(filename, mode="w")
+            import platform
+            if platform.system() == 'Windows':
+                for i, line in enumerate(open(tmp_file_name, 'r')):
+                    if i == 0 or (i-1) % multiplier == 0:
+                        print(line.strip(), file=to_file)
+            else:
+                # save the first and second line, then every `multiplier`th line to file
+                call(['awk', 'NR == 1 || NR ==2 || (NR-2) % ' + str(multiplier) + ' == 0', tmp_file_name],
+                     stdout=to_file)
+            to_file.close()
 
-        shutil.move(filename, tmp_file_name)
+            shutil.move(filename, tmp_file_name)
 
     if add_underline:
         headers, _ = read_data_file(tmp_file_name, max_rows=2)  # read only 2 data lines to speed up
@@ -147,7 +157,7 @@ def clean_result_for_plot(filename, add_underline=False, truncate_to=None, shrin
             data['t'] = data['t'] + time_offset
             save_data_file(filename, header=headers, data=data)
 
-        shutil.move(filename, tmp_file_name)
+            shutil.move(filename, tmp_file_name)
 
     # all operations done
     shutil.move(tmp_file_name, filename)
