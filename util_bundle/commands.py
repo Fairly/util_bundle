@@ -32,6 +32,14 @@ class AbstractCommand:
         self.args = docopt(str(self.__doc__), argv=command_args)
         self.global_args = global_args
 
+        # deal with wildcards in Windows
+        if '<FILE>' in self.args and ('*' in self.args['<FILE>'][0]
+                                      or '?' in self.args['<FILE>'][0]
+                                      or '[' in self.args['<FILE>'][0]
+                                      or '{' in self.args['<FILE>'][0]):
+            from glob import glob
+            self.args['<FILE>'] = glob(self.args['<FILE>'][0])
+
     def execute(self):
         """Execute the commands"""
         raise NotImplementedError
@@ -39,7 +47,7 @@ class AbstractCommand:
 
 class measure(AbstractCommand):
     """
-usage:  measure    [-m] [-t=celltype] (-d=DIR | <FILE>...)
+usage:  measure    [-m] [-t=celltype] (([-s=SUFFIX] -d=DIR) | <FILE>...)
 
 Options:
     -m          Open multi-processing.
@@ -47,6 +55,7 @@ Options:
                 Set the cell type you are measuring to 'p' for pacemaker or 'n' for non-pacemaker.
                 [default: n]
     -d=DIR      Process all files written by cell models under DIR.
+    -s=SUFFIX   Set with -d=DIR to specify the suffix of file to be processed. [default: .dat]
 Arguments:
     <FILE>...   Files to be processed.
     """
@@ -54,6 +63,7 @@ Arguments:
     def execute(self):
         schema = Schema({
             '-d': Or(None, os.path.isdir),
+            '-s': Use(str),
             '-m': bool,
             '-t': Use(str),
             '<FILE>': Or(None, [os.path.isfile], error='Cannot find file[s].'),
@@ -68,7 +78,7 @@ Arguments:
             onlyfiles = [os.path.join(args['-d'], f)
                          for f in os.listdir(args['-d'])
                          if os.path.isfile(os.path.join(args['-d'], f))]
-            current_files = [f for f in onlyfiles if 'currents' in f]
+            current_files = [f for f in onlyfiles if f.endswith(args['-s'])]
 
             p.map(measurement.measure, current_files, args['-t'])
         else:
@@ -86,7 +96,7 @@ def clean_result_for_plot(filename, add_underline=False, truncate_to=None, shrin
     """
     from subprocess import call
     backup_file_name = filename + '.backup.dat'
-    tmp_file_name = 'tmp.dat'
+    tmp_file_name = filename + 'tmp.dat'
 
     shutil.copyfile(filename, backup_file_name)  # backup
     shutil.move(filename, tmp_file_name)
@@ -338,6 +348,7 @@ usage: align [options] (-b=head | -t=tail) <FILE>...
 Align APs in several result files to allow reasonable comparison.
 
 Options:
+    -m          Open multi-processing.
     -b=head     Align to the `head`th AP from the beginning. Starts from 1.
     -t=tail     Align to the `tail`th AP from the ending. Starts from 1.
 
@@ -347,6 +358,7 @@ Options:
 
     def execute(self):
         schema = Schema({
+            '-m': bool,
             '-b': Or(None, And(Use(int), lambda n: n > 0)),
             '-t': Or(None, And(Use(int), lambda n: n > 0)),
             '-o': Use(float),
@@ -356,32 +368,37 @@ Options:
         )
         args = schema.validate(self.args)
 
+        p = ThreadPoolExecutor(cpu_count()) if args['-m'] else ThreadPoolExecutor(1)
+
         for fname in args['<FILE>']:
-            l_labels, npa_data = read_data_file(fname)
+            p.submit(self.thread_align, args, fname)
 
-            APs = measurement.ap_recognition(npa_data)
-            dt = measurement.dt_recognition(npa_data)
-
-            truncate_num = 1000000000
-            if args['-b']:
-                truncate_num = len(npa_data) - int((APs[args['-b']][0] - args['-o']) / dt)
-            elif args['-t']:
-                truncate_num = len(npa_data) - int((APs[-args['-t']][0] - args['-o']) / dt)
-
-            if truncate_num > len(npa_data):
-                pass
-            else:
-                if args['-s']:
-                    clean_result_for_plot(fname, truncate_to=truncate_num, shrink=args['-s'],
+    @staticmethod
+    def thread_align(args, fname):
+        print('Processing {}.'.format(fname))
+        l_labels, npa_data = read_data_file(fname)
+        APs = measurement.ap_recognition(npa_data)
+        dt = measurement.dt_recognition(npa_data)
+        truncate_num = 100000000000
+        if args['-b']:
+            truncate_num = len(npa_data) - int((APs[args['-b']][0] - args['-o']) / dt)
+        elif args['-t']:
+            truncate_num = len(npa_data) - int((APs[-args['-t']][0] - args['-o']) / dt)
+        if truncate_num > len(npa_data):
+            pass
+        else:
+            if args['-s']:
+                clean_result_for_plot(fname, truncate_to=truncate_num, shrink=args['-s'],
                                       reset_start_time=0, tail=True)
-                else:
-                    clean_result_for_plot(fname, truncate_to=truncate_num, reset_start_time=0, tail=True)
+            else:
+                clean_result_for_plot(fname, truncate_to=truncate_num,
+                                      reset_start_time=0, tail=True)
 
 
 class clean(AbstractCommand):
     """
 usage: clean rmbackup <DIR>
-       clean -R <BACKUPFILE>...
+       clean -R <FILE>...
        clean [options] <FILE>...
 
 Clean the data file. Original file will be backed up.
@@ -402,7 +419,6 @@ Options:
                 If regret, try this. Recover from backup files.
 Arguments:
     <FILE>...          Files to be processed.
-    <BACKUPFILE>...    Names of backup files.
     <DIR>              A directory.
     """
 
@@ -421,8 +437,7 @@ Arguments:
                          '--shrink': Or(None, Use(float)),
                          '--underline': bool,
                          '--recover': bool,
-                         '<FILE>': Or(None, [os.path.isfile]),
-                         '<BACKUPFILE>': Or(None, [os.path.isfile]),
+                         '<FILE>': Or(None, list),
                          '<DIR>': Or(None, os.path.isdir),
                          }
                         )
@@ -430,7 +445,7 @@ Arguments:
         args = schema.validate(self.args)
 
         if args['--recover']:
-            for f in args['<BACKUPFILE>']:
+            for f in args['<FILE>']:
                 original_file = f.replace('.backup.dat', '')
                 shutil.move(f, original_file)
         elif args['rmbackup']:
@@ -568,59 +583,6 @@ Arguments:
         import plotvc as pvc
         f = open(args["<YAMLFILE>"], 'r')
         pvc.plotvc(f, start=args['-s'], end=args['-e'], iftext=not args['-n'])
-
-
-class freq(AbstractCommand):
-    """
-Usage:  freq    [-m] [-s=STEP] [-c=CELLTYPE] [--] <SIMTIME>
-                (<FREQUENCY> | (<FSTART> <FSTOP>) [<FSTEP>])
-
-Options:
-  -s=STEP --step=STEP
-                The time STEP (in unit ms) used to run the cell model [default: 0.1].
-  -c=CELLTYPE --celltype=CELLTYPE
-                Specify a cell type. 1 for atria, 0 for ventricles. [default: 1]
-
-Arguments:
-  SIMTIME       Specify how long the simulation is (unit second).
-  FREQUENCY     An integer for running only one frequency.
-  FSTART FSTOP FSTEP
-                Specify a range of frequencies.
-    """
-
-    def execute(self):
-        schema = Schema({
-            '--step': Use(float),
-            '--celltype': Use(int),
-            '<SIMTIME>': Or(None, Use(float)),
-            '<FREQUENCY>': Or(None, Use(float), error='FREQUENCY must be a number.'),
-            '<FSTART>': Or(None, Use(int)),
-            '<FSTOP>': Or(None, Use(int)),
-            '<FSTEP>': Or(None, Use(int)),
-            '--': bool
-        }
-        )
-
-        args = schema.validate(self.args)
-
-        if args['<FREQUENCY>']:
-            # if only one frequency is specified in args, change it into a range
-            # format
-            f = [args['<FREQUENCY>'], args['<FREQUENCY>'] + 1]
-        elif args['<FSTEP>']:
-            f = [args['<FSTART>'], args['<FSTOP>'], args['<FSTEP>']]
-        else:
-            f = [args['<FSTART>'], args['<FSTOP>']]
-
-        params = []
-        for _freq in np.arange(*f):
-            params.append(["./" + CELL_MODEL,
-                           str(int(1000 / _freq)),
-                           str(int(args['<SIMTIME>'] * _freq)),
-                           str(args['--step'])])
-        # Multi-process
-        p = ThreadPoolExecutor(cpu_count()) if args['-m'] else ThreadPoolExecutor(1)
-        p.map(call, params)
 
 
 class burst(AbstractCommand):
