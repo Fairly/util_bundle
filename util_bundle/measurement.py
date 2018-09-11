@@ -339,7 +339,7 @@ def measure(infilename, celltype='n'):
 
                 highv_found = False
                 lowv_found  = False
-    
+
                 param_counter += 1
 
             dvdtold = dvdt
@@ -356,8 +356,9 @@ def measure(infilename, celltype='n'):
 
     # Output results
     if '.' in infilename:
-        suffix = infilename.split('.')[1]
-        out_file_name = infilename.replace('.' + suffix, '_measurement.dat')
+        index_suffix = infilename.rfind('.')
+        suffix = infilename[index_suffix:]
+        out_file_name = infilename.replace(suffix, '_measurement.dat')
     else:
         out_file_name = infilename + '_measurement.dat'
 
