@@ -1,3 +1,4 @@
+import sys
 import unittest
 from pprint import pprint
 
@@ -55,6 +56,15 @@ class TestPlotMethods(unittest.TestCase):
         self.assertFalse(iflastrow(3, 3, 10))
         self.assertFalse(iflastrow(3, 8, 12))
         self.assertFalse(iflastrow(3, 7, 12))
+
+
+class TestVcleanMethods(unittest.TestCase):
+    # TODO
+    def test_vclean(self):
+        sys.argv = ['run.py', 'vclean', './vclean/*']
+
+        self.assertTrue(True)
+
 
 if __name__ == '__main__':
     x = np.array([(1.5, 2.5, (1.0, 2.0)), (3., 4., (4., 5.)), (1., 3., (2., 6.))],
