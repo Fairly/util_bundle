@@ -25,9 +25,96 @@ Voltage_Clamp:
 """
 import numpy as np
 import matplotlib.pyplot as plt
-import yaml
+from yaml import load
 
 import mpl_setting
+import util
+
+
+def vclean(l_files, l_targets, xaxis=1, start=None, end=None):
+    """
+        vclean(l_files, l_targets, usemin)
+
+            Parameters
+            ----------
+            l_files : list of str
+
+            l_targets : list of str
+
+            usemin : bool, optional
+
+            xaxis: int
+
+            start : None, int
+
+            end: None, int
+
+    """
+    # read in files
+    origin_header = []
+    origin_data = []
+    for _f in l_files:
+        headers, data = util.read_data_file(_f)
+        origin_header.append(headers)
+        origin_data.append(data)
+
+    prefix = l_files[0]
+    prefix = prefix[0:prefix.find('_')]
+
+    maxlength = 0
+    for _d in origin_data:
+        if len(_d) > maxlength:
+            maxlength = len(_d)
+
+    # reorganize data
+    for _t in l_targets:
+        # generate the summary file
+        sum_data = np.zeros((maxlength, len(origin_data) + 2))
+        sum_header = ['t', 'V_m']
+
+        for index_file in range(len(origin_header)):
+            if len(origin_data[index_file]) == maxlength:
+                sum_data[:, 0] = origin_data[index_file]['t']
+                sum_data[:, 1] = origin_data[index_file]['V_m']
+
+            if _t not in origin_header[index_file]:
+                print('Error: No data for target:{} in the data file. Exit.'.format(_t))
+                exit(1)
+
+            sum_data[:len(origin_data[index_file]), index_file + 2] = origin_data[index_file][_t]
+
+            _h = l_files[index_file].replace('.dat', '')
+            for i in range(xaxis-1):
+                _h = _h[:_h.rfind('_')]
+            _h = _h[_h.rfind('_')+1:]
+            sum_header.append(_h)
+
+        summary_file = _t + '_' + prefix + '_summary.dat'
+        util.save_data_file(summary_file, sum_header, sum_data)
+
+        # generate the I-V relationship
+        iv_header = ['V', 'I']
+        iv_data = np.zeros((len(l_files), 2))
+
+        import re
+        for _i in range(2, len(sum_header)):
+            V = sum_header[_i]
+            V = re.sub(r'[a-zA-Z]', '', V)
+            V = float(V)
+
+            if start is not None and end is not None:
+                max_index = np.argmax(np.abs(sum_data[start:end, _i]))
+            else:
+                start = 0
+                max_index = np.argmax(np.abs(sum_data[:, _i]))
+
+            I = sum_data[start+max_index, _i]
+            iv_data[_i-2] = V, I
+
+        iv_data = iv_data[iv_data[:, 0].argsort()]  # sort by the first column
+
+        iv_file = _t + '_' + prefix + '_IV.dat'
+        util.save_data_file(iv_file, iv_header, iv_data)
 
 
 def plotvc(vc_yaml, start=1, end=0, iftext=True):
@@ -40,7 +127,7 @@ def plotvc(vc_yaml, start=1, end=0, iftext=True):
     :return:
     """
     mpl_setting.set_matplotlib_default()
-    config = yaml.load(vc_yaml)
+    config = load(vc_yaml)
 
     plt.figure(figsize=[mpl_setting.fig_size[0]/4, mpl_setting.fig_size[1]/8])
 

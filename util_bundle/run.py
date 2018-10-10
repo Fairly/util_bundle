@@ -5,6 +5,7 @@ Usage:
     run.py -h
 
 Command:
+  vclean        Refine data for voltage-clamp results.
   clean         Clean a result file for plotting.
   align         Align data in results for reasonable comparison.
   measure       Calculate characteristics of APs from results of cell models.

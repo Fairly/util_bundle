@@ -11,6 +11,7 @@ import numpy as np
 import matplotlib as mpl
 import matplotlib.pyplot as plt
 from matplotlib.ticker import FuncFormatter
+from yaml import load
 
 from util import read_data_file, save_data_file, bar_arrange
 from util_bundle.measurement import dt_recognition
@@ -33,10 +34,11 @@ class AbstractCommand:
         self.global_args = global_args
 
         # deal with wildcards in Windows
-        if '<FILE>' in self.args and ('*' in self.args['<FILE>'][0]
-                                      or '?' in self.args['<FILE>'][0]
-                                      or '[' in self.args['<FILE>'][0]
-                                      or '{' in self.args['<FILE>'][0]):
+        if '<FILE>' in self.args and self.args['<FILE>']\
+                and ('*' in self.args['<FILE>'][0]
+                     or '?' in self.args['<FILE>'][0]
+                     or '[' in self.args['<FILE>'][0]
+                     or '{' in self.args['<FILE>'][0]):
             from glob import glob
             self.args['<FILE>'] = glob(self.args['<FILE>'][0])
 
@@ -584,6 +586,69 @@ Arguments:
         import plotvc as pvc
         f = open(args["<YAMLFILE>"], 'r')
         pvc.plotvc(f, start=args['-s'], end=args['-e'], iftext=not args['-n'])
+
+
+class vclean(AbstractCommand):
+    """
+Usage:
+      vclean  [options] [-s num] [-i <START> <END>] [-t=TARGET] -y <YAMLFILE>
+      vclean  [options] [-s num] [-i <START> <END>] -t=TARGET <FILE>...
+
+In the directory of voltage-clamp results, run this to get refined results.
+
+Options:
+  -i          Toggle the specification of the interested interval of data.
+  -s=num      An integer define which part will be extracted from the file name as the data labels. [default: 1]
+  -t=TARGET   Set the target to be extracted from results. Should be a comma separated string.
+              For example, 'I_Na,I_Na_m,I_Na_h'.
+  -y          Toggle the yaml model. Read all files in current dir with name prefix defined in the yaml file.
+
+Arguments:
+  <YAMLFILE>  The config file containing the voltage clamp protocol.
+  <FILE>...   Result files specified.
+  <START> <END>
+              Starting and ending lines of data of the interested time interval in this voltage clamp.
+    """
+
+    def execute(self):
+        schema = Schema({
+            "-i": bool,
+            "-s": Use(int),
+            "-t": Or(None, str),
+            "-y": bool,
+            "<YAMLFILE>": Or(None, os.path.isfile),
+            "<FILE>": [os.path.isfile],
+            "<START>": Or(None, Use(int)),
+            "<END>": Or(None, Use(int)),
+        }
+        )
+
+        args = schema.validate(self.args)
+
+        l_files = []
+        if args['<YAMLFILE>']:
+            yfile = open(args["<YAMLFILE>"], 'r')
+            config = load(yfile)
+            result_prefix = config['Config']['RESULT_FILE_NAME']
+
+            if 'Voltage_Clamp' in config and config['Voltage_Clamp'] is not None:
+                l_files = [f for f in os.listdir('.')
+                           if os.path.isfile(f)
+                           and f.startswith(result_prefix)]
+            else:
+                print('Error: No "Voltage_Clamp" is defined in the .yaml file. Exit.')
+                exit(1)
+
+            if args['-t']:
+                targets = args['-t'].split(',')
+            else:
+                targets = [config['Voltage_Clamp']['Target']]
+        else:
+            l_files = args['<FILE>']
+            targets = args['-t'].split(',')
+
+        import plotvc as pvc
+        pvc.vclean(l_files, targets, xaxis=args['-s'], start=args['<START>'], end=args['<END>'])
 
 
 class burst(AbstractCommand):
