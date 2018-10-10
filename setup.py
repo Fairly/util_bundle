@@ -9,5 +9,5 @@ setup(
     author_email='shanzhuo.zhang@gmail.com',
     packages=find_packages(),
     include_package_data=True,
-    install_requires=['numpy', 'matplotlib', 'docopt', 'schema', 'scipy']
+    install_requires=['numpy', 'matplotlib', 'docopt', 'schema', 'scipy', 'PyYAML']
 )

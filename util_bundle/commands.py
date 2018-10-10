@@ -462,9 +462,10 @@ class qplot(AbstractCommand):
     """
 An quick interface for plotting and comparing APs or currents.
 
-usage: qplot [options] [(-x <XSTART> <XEND>)] (<FILE> <LABEL>)...
+usage:
+       qplot [options] [(-x <XSTART> <XEND>)] <FILE>...
+       qplot [options] [(-x <XSTART> <XEND>)] -L (<FILE> <LABEL>)...
        qplot [options] -s (<FSTART> <FEND> <FILE> <LABEL>)...
-       qplot [options] [(-x <XSTART> <XEND>)] -L <FILE>...
 
 Options:
     -V          Trigger for whether plotting the AP.
@@ -488,7 +489,7 @@ Options:
     -x          Whether set limits on the x axis.
     -s          Separately set x-limits of all FILEs.
 
-    -L          If this is set, no need to provide labels for files.
+    -L          If this is set, provide labels for files and labels will be use as legends in the figure.
 
 Arguments:
     <XSTART> <XEND>
