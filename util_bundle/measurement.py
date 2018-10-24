@@ -140,7 +140,7 @@ def measure(infilename, celltype='n'):
         upstroke_duration = 8
 
         # Calculation starts here
-        result_header_list = ["Beat", "AP_Min", "AP_Max", "AP_Amp",
+        result_header_list = ["Beat", "Stim_t", "AP_Min", "AP_Max", "AP_Amp",
                               "dVdt_Max", "dVdt_Max_t",  # maximum dVdt and the time of it
                               "Ca_i_Max", "Ca_i_Dia", "Ca_i_Amp",
                               "Na_i_Dia", "Ca_i_tau",
@@ -195,7 +195,7 @@ def measure(infilename, celltype='n'):
             amp_ap = max_ap - min_ap_beforepeak
             amp_ca_i = max_ca_i - min_ca_i_beforepeak
 
-            tmp = [min_ap_afterpeak, max_ap, amp_ap, max_dvdt, max_dvdt_t,
+            tmp = [l_ap[beat][0], min_ap_afterpeak, max_ap, amp_ap, max_dvdt, max_dvdt_t,
                    max_ca_i, min_ca_i_afterpeak, amp_ca_i, min_na_i]
             result[beat, 1:len(tmp) + 1] = tmp
             # End of a single beat
