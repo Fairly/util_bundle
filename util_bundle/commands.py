@@ -465,9 +465,8 @@ class qplot(AbstractCommand):
 An quick interface for plotting and comparing APs or currents.
 
 usage:
-       qplot [options] [(-x <XSTART> <XEND>)] <FILE>...
-       qplot [options] [(-x <XSTART> <XEND>)] -L (<FILE> <LABEL>)...
-       qplot [options] -s (<FSTART> <FEND> <FILE> <LABEL>)...
+       qplot [options] [-x=xlim -y=ylim] <FILE>...
+       qplot [options] [-x=xlim -y=ylim] -L (<FILE> <LABEL>)...
 
 Options:
     -V          Trigger for whether plotting the AP.
@@ -488,18 +487,15 @@ Options:
     -o=OUT      The file name of the output figure.
                 If not given, show the figure instead of saving it.
 
-    -x          Whether set limits on the x axis.
-    -s          Separately set x-limits of all FILEs.
+    -x=xlim     Set limits on the x axis. `xlim` is a comma separated string. e.g.: '10,100'
+                means to plot the range [10, 100] on the x-axis.
+    -y=ylim     Set limits on the y axis. Same definition with `xlim` above.
 
     -L          If this is set, provide labels for files and labels will be use as legends in the figure.
 
 Arguments:
-    <XSTART> <XEND>
-                The starting and ending points of x-limits.
     <FILE>      File names.
     <LABEL>     One Label for one file.
-    <FSTART> <FEND>
-                The starting and ending points of x-limits of each FILE.
     """
 
     def execute(self):
@@ -512,15 +508,11 @@ Arguments:
             '-c': bool,
             '-S': bool,
             '-o': Or(None, And(str, len)),
-            '-x': bool,
-            '-s': bool,
             '-L': bool,
             '<FILE>': [os.path.isfile],
             '<LABEL>': Or(None, [str]),
-            '<XEND>': Or(None, Use(float)),
-            '<XSTART>': Or(None, Use(float)),
-            '<FEND>': Or(None, [Use(float)]),
-            '<FSTART>': Or(None, [Use(float)]),
+            '-x': Or(None, str),
+            '-y': Or(None, str),
         })
 
         args = schema.validate(self.args)
@@ -542,11 +534,14 @@ Arguments:
         plot_flag = list(set(plot_flag))  # remove duplicated items
 
         if args['-x']:
-            xlim = (args['<XSTART>'], args['<XEND>'])
-        elif args['-s']:
-            xlim = (args['<FSTART>'], args['<FEND>'])
+            xlim = [float(i) for i in args['-x'].split(',')]
         else:
             xlim = None
+
+        if args['-y']:
+            ylim = [float(i) for i in args['-y'].split(',')]
+        else:
+            ylim = None
 
         if args['-c']:
             color = 'k'
@@ -554,7 +549,7 @@ Arguments:
             color = None
 
         myplot.autoplot(args['<FILE>'], args['<LABEL>'],
-                        flags=plot_flag, outfigname=args['-o'], xlimit=xlim,
+                        flags=plot_flag, outfigname=args['-o'], xlimit=xlim, ylimit=ylim,
                         color=color, mplsetting=args['-S'], max_panel_num=args['-p'])
 
 
@@ -591,8 +586,8 @@ Arguments:
 class vclean(AbstractCommand):
     """
 Usage:
-      vclean  [options] [-s num] [-i <START> <END>] [-t=TARGET] -y <YAMLFILE>
-      vclean  [options] [-s num] [-i <START> <END>] -t=TARGET <FILE>...
+      vclean  [options] [-s num] [(-i <START> <END>)] [-t=TARGET] -y <YAMLFILE>
+      vclean  [options] [-s num] [(-i <START> <END>)] -t=TARGET <FILE>...
 
 In the directory of voltage-clamp results, run this to get refined results.
 

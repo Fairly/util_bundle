@@ -128,7 +128,7 @@ def gen_data(l_input_filename, l_labels=None):
     return data
 
 
-def my_plot(data, l_field_names, xlimit=None, color=None, mplsetting=False):
+def my_plot(data, l_field_names, xlimit=None, ylimit=None, color=None, mplsetting=False):
     if mplsetting:
         fig = plt.figure(figsize=[mpl_setting.fig_size[0] / 2, mpl_setting.fig_size[1] / 4])
     else:
@@ -180,9 +180,14 @@ def my_plot(data, l_field_names, xlimit=None, color=None, mplsetting=False):
     # let all axes share a same x-axis, making it easy to zoom in or out together
     fig.axes[0].get_shared_x_axes().join(*fig.axes)
 
+    # set ylimits for all axes
+    if ylimit is not None:
+        for axe in fig.axes:
+            axe.set_ylim(*ylimit)
+
 
 def autoplot(l_input_filename, l_label=None, flags=('all',),
-             xlimit=None, outfigname=None, color=None,
+             xlimit=None, ylimit=None, outfigname=None, color=None,
              mplsetting=False, max_panel_num=12):
     """
 
@@ -192,7 +197,7 @@ def autoplot(l_input_filename, l_label=None, flags=('all',),
     :param l_input_filename:
     :param l_label:
     :param flags:
-    :param xlimit: None, tuple or a tuple of two list
+    :param xlimit: None, tuple
     :param outfigname: If no fig name is given, no fig will be saved.
     :param max_panel_num:
     """
@@ -200,16 +205,6 @@ def autoplot(l_input_filename, l_label=None, flags=('all',),
         mpl_setting.set_matplotlib_default()
 
     data = gen_data(l_input_filename, l_label)
-
-    # translation data to align them
-    if xlimit is not None and isinstance(xlimit[0], list):
-        start, end = xlimit
-        new_end = []
-        for s, e, d in zip(start, end, data):
-            d['data'][d['xaxis']] = d['data'][d['xaxis']] - s  # translation the 'xaxis' column of d['data']
-            new_end.append(e - s)
-        max_end = max(new_end)
-        xlimit = (0, max_end)
 
     # collect fields that will be plotted
     field_names = data[0]['l_field_names']
@@ -252,10 +247,10 @@ def autoplot(l_input_filename, l_label=None, flags=('all',),
     # plot
     while len(l_gca) != 0:
         if len(l_gca) > max_panel_num:
-            my_plot(data, l_gca[0:max_panel_num], xlimit, color, mplsetting)
+            my_plot(data, l_gca[0:max_panel_num], xlimit, ylimit, color, mplsetting)
             l_gca = l_gca[max_panel_num:]
         else:
-            my_plot(data, l_gca, xlimit, color, mplsetting)
+            my_plot(data, l_gca, xlimit, ylimit, color, mplsetting)
             l_gca = []
 
     # output
