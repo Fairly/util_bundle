@@ -206,15 +206,15 @@ def measure(infilename, celltype='n'):
             beat_start, beat_end = get_range(beat, dt, l_ap)
 
             # In a single beat
-            ap_90 = result[beat, 2] - 0.9 * (result[beat, 2] - result[beat, 1])
-            ap_80 = result[beat, 2] - 0.8 * (result[beat, 2] - result[beat, 1])
-            ap_75 = result[beat, 2] - 0.75 * (result[beat, 2] - result[beat, 1])
-            ap_70 = result[beat, 2] - 0.7 * (result[beat, 2] - result[beat, 1])
-            ap_50 = result[beat, 2] - 0.5 * (result[beat, 2] - result[beat, 1])
-            ap_30 = result[beat, 2] - 0.3 * (result[beat, 2] - result[beat, 1])
-            ap_25 = result[beat, 2] - 0.25 * (result[beat, 2] - result[beat, 1])
-            ap_20 = result[beat, 2] - 0.20 * (result[beat, 2] - result[beat, 1])
-            cai_tau = result[beat, 7] / math.e + result[beat, 6]
+            ap_90 = result[beat, 3] - 0.9 * (result[beat, 3] - result[beat, 2])
+            ap_80 = result[beat, 3] - 0.8 * (result[beat, 3] - result[beat, 2])
+            ap_75 = result[beat, 3] - 0.75 * (result[beat, 3] - result[beat, 2])
+            ap_70 = result[beat, 3] - 0.7 * (result[beat, 3] - result[beat, 2])
+            ap_50 = result[beat, 3] - 0.5 * (result[beat, 3] - result[beat, 2])
+            ap_30 = result[beat, 3] - 0.3 * (result[beat, 3] - result[beat, 2])
+            ap_25 = result[beat, 3] - 0.25 * (result[beat, 3] - result[beat, 2])
+            ap_20 = result[beat, 3] - 0.20 * (result[beat, 3] - result[beat, 2])
+            cai_tau = result[beat, 8] / math.e + result[beat, 7]
 
             # values below are not always foundable. If cannot find, assign 0.
             tau_decay_cai = 0
@@ -232,35 +232,35 @@ def measure(infilename, celltype='n'):
 
                 # APD25
                 if row[i_v] <= ap_25 <= data[current_row_num - 1][i_v]:
-                    apd_25 = row[i_t] - result[beat, 5]  # result[beat, 5] is the time of dVdt_max
+                    apd_25 = row[i_t] - result[beat, 6]  # result[beat, 6] is the time of dVdt_max
 
                 # APD20
                 if row[i_v] <= ap_20 <= data[current_row_num - 1][i_v]:
-                    apd_20 = row[i_t] - result[beat, 5]  # result[beat, 5] is the time of dVdt_max
+                    apd_20 = row[i_t] - result[beat, 6]  # result[beat, 6] is the time of dVdt_max
 
                 # APD30
                 if row[i_v] <= ap_30 <= data[current_row_num - 1][i_v]:
-                    apd_30 = row[i_t] - result[beat, 5]
+                    apd_30 = row[i_t] - result[beat, 6]
 
                 # APD50
                 if row[i_v] <= ap_50 <= data[current_row_num - 1][i_v]:
-                    apd_50 = row[i_t] - result[beat, 5]
+                    apd_50 = row[i_t] - result[beat, 6]
 
                 # APD70
                 if row[i_v] <= ap_70 <= data[current_row_num - 1][i_v]:
-                    apd_70 = row[i_t] - result[beat, 5]
+                    apd_70 = row[i_t] - result[beat, 6]
 
                 # APD75
                 if row[i_v] <= ap_75 <= data[current_row_num - 1][i_v]:
-                    apd_75 = row[i_t] - result[beat, 5]
+                    apd_75 = row[i_t] - result[beat, 6]
 
                 # APD80
                 if row[i_v] <= ap_80 <= data[current_row_num - 1][i_v]:
-                    apd_80 = row[i_t] - result[beat, 5]
+                    apd_80 = row[i_t] - result[beat, 6]
 
                 # APD90
                 if row[i_v] <= ap_90 <= data[current_row_num - 1][i_v]:
-                    apd_90 = row[i_t] - result[beat, 5]
+                    apd_90 = row[i_t] - result[beat, 6]
 
                 # Time constant of Cai decay
                 if row[i_ca_i] <= cai_tau <= data[current_row_num - 1][i_ca_i]:
