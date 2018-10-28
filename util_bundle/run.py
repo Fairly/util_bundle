@@ -7,9 +7,11 @@ Usage:
 Command:
   vclean        Refine data for voltage-clamp results.
   clean         Clean a result file for plotting.
+  datareduce    A quick method reducing data from various data files.
   align         Align data in results for reasonable comparison.
   measure       Calculate characteristics of APs from results of cell models.
 
+  eplot         Very easy plot with limited functionality.
   qplot         Plot AP or current traces by a simple script.
   plot          Plot figures.
   plotvc        Plot the curve of voltage clamp protocol.

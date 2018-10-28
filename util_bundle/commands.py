@@ -460,6 +460,134 @@ Arguments:
                                       reset_start_time=args['--reset-time'])
 
 
+class datareduce(AbstractCommand):
+    """
+usage: datareduce [-s=num] [-m=mode] -y=yaxis <FILE>...
+
+Options:
+    -s=num      An integer define which part will be extracted from the file name
+                as the data labels. For example, if file name is 'result_s1s2-25.dat',
+                and this parameter is set to 1, 's1s2-25' will be extracted and used
+                as the first column in the output. [default: 1]
+    -y=yaxis    A ',' separate string specifying the column(s) used for the y-axis.
+    -m=mode     Mode can be `l` for last, `b` for biggest, or `s` for smallest. This
+                parameter sets the behaviour of extracting which value out from the
+                yaxis. So it can extract the last, biggest or smallest value. [default: l]
+
+Arguments:
+    <FILE>      File names.
+    """
+    def execute(self):
+        schema = Schema({
+            '-s': Use(int),
+            '-y': str,
+            '-m': str,
+            '<FILE>': [os.path.isfile],
+        })
+
+        args = schema.validate(self.args)
+
+        target = args['<FILE>'][0].split('_')[args['-s']]
+        xaxis_name = target.split('-')[0]
+
+        yaxis_name = args['-y'].split(',')
+
+        result = []
+        for fname in args['<FILE>']:
+            _, m = read_data_file(fname)
+
+            target = fname.split('_')[args['-s']]
+            xaxis = target.split('-')[1]
+            xaxis = float(xaxis)
+
+            y_result = []
+            for _y_name in yaxis_name:
+                if args['-m'] == 'l':
+                    y_value = m[-1][_y_name]
+                elif args['-m'] == 'b':
+                    y_value = max(m[_y_name])
+                elif args['-m'] == 's':
+                    y_value = min(m[_y_name])
+                else:
+                    y_value = 0.0
+
+                y_result.append(y_value)
+
+            result.append([xaxis, *y_result])
+
+        print(result)
+        save_data_file('s1s2-APD.dat', [xaxis_name, *yaxis_name], result)
+
+
+class eplot(AbstractCommand):
+    """
+An easy plot command.
+
+usage:  eplot  [-x=xaxis] -y=yaxis <FILE>...
+
+Options:
+    -x=xaxis    Specify the column used for the x-axis. `xaxis` can be a number (start from 0)
+                or the name of the column. [default: 0]
+    -y=yaxis    A ',' separate string specifying the column(s) used for the y-axis.
+
+Arguments:
+    <FILE>      File names.
+    """
+    def execute(self):
+        schema = Schema({
+            '-x': Or(int, str),
+            '-y': str,
+            '<FILE>': [os.path.isfile],
+        })
+
+        args = schema.validate(self.args)
+
+        # read files
+        l_headers = []
+        l_datas = []
+        l_filenames = []
+        for f in args['<FILE>']:
+            try:
+                header, data = read_data_file(f)
+            except:
+                print('Read file error for file: {}. Continue.'.format(f))
+                continue
+
+            l_headers.append(header)
+            l_datas.append(data)
+            l_filenames.append(f)
+
+        # parse xaxis and yaxis
+        header = l_headers[0]
+        x = args['-x']
+        if x.isdigit():
+            x = header[int(x)]
+        else:
+            pass
+
+        l_y = args['-y'].split(',')
+        for i, y in enumerate(l_y):
+            if y.isdigit():
+                l_y[i] = header[int(y)]
+            else:
+                pass
+
+        # plot
+        for y in l_y:
+            plt.figure()
+            for i, f in enumerate(l_filenames):
+                try:
+                    tmp = l_datas[i][y]  # if this file has no column named y, skip the plot
+                except:
+                    continue
+
+                plt.plot(l_datas[i][x], l_datas[i][y], label=f+' '+y)
+
+            plt.legend()
+
+        plt.show()
+
+
 class qplot(AbstractCommand):
     """
 An quick interface for plotting and comparing APs or currents.
