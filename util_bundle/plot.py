@@ -150,11 +150,11 @@ def my_plot(data, l_field_names, xlimit=None, ylimit=None, color=None, mplsettin
             if column_name in d['l_field_names']:
                 if color:
                     axe.plot(d['data'][d['xaxis']],
-                             d['data'][column_name],
+                             d['data'][column_name.replace('.', '')],
                              label=d['label'], color=color)
                 else:
                     axe.plot(d['data'][d['xaxis']],
-                             d['data'][column_name],
+                             d['data'][column_name.replace('.', '')],
                              label=d['label'])
                 axe.yaxis.set_major_formatter(major_form)
 
@@ -252,6 +252,7 @@ def autoplot(l_input_filename, l_label=None, flags=('all',),
         else:
             my_plot(data, l_gca, xlimit, ylimit, color, mplsetting)
             l_gca = []
+        plt.gcf().suptitle(l_input_filename[0])  # use the first file name as title for convenience
 
     # output
     if outfigname is not None:
