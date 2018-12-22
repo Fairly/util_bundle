@@ -521,14 +521,16 @@ Arguments:
 
 class eplot(AbstractCommand):
     """
-An easy plot command.
+An easy plot command for single data files. Unlike `qplot`, this command is designed to plot compact data
+in each file, not extracted data from a series of files.
 
 usage:  eplot  [-x=xaxis] -y=yaxis <FILE>...
 
 Options:
     -x=xaxis    Specify the column used for the x-axis. `xaxis` can be a number (start from 0)
                 or the name of the column. [default: 0]
-    -y=yaxis    A ',' separate string specifying the column(s) used for the y-axis.
+    -y=yaxis    A ',' separate string specifying the column(s) used for the y-axis. If set to 'all', all fields
+                will be plotted.
 
 Arguments:
     <FILE>      File names.
@@ -543,9 +545,6 @@ Arguments:
         args = schema.validate(self.args)
 
         # read files
-        l_headers = []
-        l_datas = []
-        l_filenames = []
         for f in args['<FILE>']:
             try:
                 header, data = read_data_file(f)
@@ -553,38 +552,31 @@ Arguments:
                 print('Read file error for file: {}. Continue.'.format(f))
                 continue
 
-            l_headers.append(header)
-            l_datas.append(data)
-            l_filenames.append(f)
-
-        # parse xaxis and yaxis
-        header = l_headers[0]
-        x = args['-x']
-        if x.isdigit():
-            x = header[int(x)]
-        else:
-            pass
-
-        l_y = args['-y'].split(',')
-        for i, y in enumerate(l_y):
-            if y.isdigit():
-                l_y[i] = header[int(y)]
+            # parse xaxis and yaxis
+            x = args['-x']
+            if x.isdigit():
+                x = header[int(x)]
             else:
                 pass
 
-        # plot
-        for y in l_y:
+            l_y = args['-y'].split(',')
+            for i, y in enumerate(l_y):
+                if y.isdigit():
+                    l_y[i] = header[int(y)]
+                else:
+                    pass
+
+            # plot
             plt.figure()
-            for i, f in enumerate(l_filenames):
+            for y in l_y:
                 try:
-                    tmp = l_datas[i][y]  # if this file has no column named y, skip the plot
+                    tmp = data[y.replace('.', '')]  # if this file has no column named y, skip the plot
                 except:
                     continue
 
-                plt.plot(l_datas[i][x], l_datas[i][y], label=f+' '+y)
+                plt.plot(data[x], data[y.replace('.', '')], label=f+' '+y)
 
-            plt.legend()
-
+        plt.legend()
         plt.show()
 
 
