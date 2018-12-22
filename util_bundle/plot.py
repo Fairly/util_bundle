@@ -186,7 +186,7 @@ def my_plot(data, l_field_names, xlimit=None, ylimit=None, color=None, mplsettin
             axe.set_ylim(*ylimit)
 
 
-def autoplot(l_input_filename, l_label=None, flags=('all',),
+def autoplot(l_input_filename, l_label=None, xaxis=None, flags=('all',),
              xlimit=None, ylimit=None, outfigname=None, color=None,
              mplsetting=False, max_panel_num=12):
     """
@@ -205,6 +205,10 @@ def autoplot(l_input_filename, l_label=None, flags=('all',),
         mpl_setting.set_matplotlib_default()
 
     data = gen_data(l_input_filename, l_label)
+
+    if xaxis is not None:
+        for d in data:
+            d['xaxis'] = xaxis
 
     # collect fields that will be plotted
     field_names = data[0]['l_field_names']

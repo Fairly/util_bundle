@@ -597,6 +597,9 @@ usage:
        qplot [options] [-x=xlim -y=ylim] -L (<FILE> <LABEL>)...
 
 Options:
+    --xaxis=x   In special cases, a column used for the x-axis in plotting can be set.
+                `x` is a string which is the name or number of the column used as the x-axis.
+
     -V          Trigger for whether plotting the AP.
     -I          Trigger for whether plotting currents.
     -A          Trigger for whether plotting all fields.
@@ -631,6 +634,7 @@ Arguments:
 
     def execute(self):
         schema = Schema({
+            '--xaxis': Or(None, str),
             '-I': bool,
             '-V': bool,
             '-A': bool,
@@ -648,6 +652,8 @@ Arguments:
 
         args = schema.validate(self.args)
 
+        header, _ = read_data_file(args['<FILE>'][0], max_rows=2)
+
         plot_flag = []
         if args['-A']:
             plot_flag.append('all')
@@ -659,11 +665,17 @@ Arguments:
             if args['-C']:
                 if args['-C'].split(',')[0].isdigit():
                     indexes = map(int, args['-C'].split(','))
-                    header, _ = read_data_file(args['<FILE>'][0])
                     for i in indexes:
                         plot_flag.append(header[i])
                 else:
                     plot_flag.extend(args['-C'].split(','))
+
+        xaxis = None
+        if args['--xaxis'] is not None:
+            if args['--xaxis'].isdigit():
+                xaxis = header[int(args['--xaxis'])]
+            else:
+                xaxis = args['--xaxis']
 
         if not plot_flag:  # default: plot voltage
             plot_flag.append('V')
@@ -685,7 +697,7 @@ Arguments:
         else:
             color = None
 
-        myplot.autoplot(args['<FILE>'], args['<LABEL>'],
+        myplot.autoplot(args['<FILE>'], args['<LABEL>'], xaxis=xaxis,
                         flags=plot_flag, outfigname=args['-o'], xlimit=xlim, ylimit=ylim,
                         color=color, mplsetting=args['-S'], max_panel_num=args['-p'])
 
