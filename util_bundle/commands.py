@@ -604,6 +604,9 @@ Options:
                 "V,I" means plotting fields whose name starts with "V" or "I".
                 Also supports the use of '!' before a field name to remove fields from plotting.
                 "!I_Ca" means not plotting fields starts with "I_Ca".
+                CTM can also be ',' separated numbers. In this case, the number defines which column(s)
+                to be plotted. '1,2' means the first and second column (except the real first column,
+                which is usually the x-axis) will be plotted.
 
     -p=pnum     Max number of panels in a single figure. Set to a big value to
                 plot all panels in one figure, or a small number to make the
@@ -654,7 +657,13 @@ Arguments:
             if args['-I']:
                 plot_flag.append('I')
             if args['-C']:
-                plot_flag.extend(args['-C'].split(','))
+                if args['-C'].split(',')[0].isdigit():
+                    indexes = map(int, args['-C'].split(','))
+                    header, _ = read_data_file(args['<FILE>'][0])
+                    for i in indexes:
+                        plot_flag.append(header[i])
+                else:
+                    plot_flag.extend(args['-C'].split(','))
 
         if not plot_flag:  # default: plot voltage
             plot_flag.append('V')
