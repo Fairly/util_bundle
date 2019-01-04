@@ -487,8 +487,10 @@ Arguments:
 
         args = schema.validate(self.args)
 
-        target = args['<FILE>'][0].split('_')[args['-s']]
-        xaxis_name = target.split('-')[0]
+        first_filename = args['<FILE>'][0]
+        path, name = os.path.split(first_filename)
+        target = name.split('_')[args['-s']]
+        xaxis_name = target[:target.find('-')]
 
         yaxis_name = args['-y'].split(',')
 
@@ -496,8 +498,10 @@ Arguments:
         for fname in args['<FILE>']:
             _, m = read_data_file(fname)
 
-            target = fname.split('_')[args['-s']]
-            xaxis = target.split('-')[1]
+            target = os.path.basename(fname)
+            target = os.path.splitext(target)[0]
+            target = target.split('_')[args['-s']]
+            xaxis = target[target.find('-')+1:]
             xaxis = float(xaxis)
 
             y_result = []
@@ -515,8 +519,9 @@ Arguments:
 
             result.append([xaxis, *y_result])
 
-        print(result)
-        save_data_file('s1s2-APD.dat', [xaxis_name, *yaxis_name], result)
+        result.sort()
+        save_data_file(os.path.join(path, xaxis_name + '-' + '+'.join(yaxis_name) + '.dat'),
+                       [xaxis_name, *yaxis_name], result)
 
 
 class eplot(AbstractCommand):
