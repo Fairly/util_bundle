@@ -214,7 +214,7 @@ def measure(infilename, celltype='n'):
             ap_30 = result[beat, 3] - 0.3 * (result[beat, 3] - result[beat, 2])
             ap_25 = result[beat, 3] - 0.25 * (result[beat, 3] - result[beat, 2])
             ap_20 = result[beat, 3] - 0.20 * (result[beat, 3] - result[beat, 2])
-            cai_tau = result[beat, 8] / math.e + result[beat, 7]
+            cai_tau = result[beat, 8] * (1 - 1 / math.e) + result[beat, 7] / math.e
 
             # values below are not always foundable. If cannot find, assign 0.
             tau_decay_cai = 0
