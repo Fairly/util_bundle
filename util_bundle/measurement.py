@@ -90,7 +90,7 @@ def ap_recognition(data, time_prefix='t', stim_prefix='I_Stim'):
     return l_ap
 
 
-def get_range(beat, dt, l_ap):
+def get_range(beat, dt, l_ap, time_offset=0):
     """
     Given the beat No., dt, and list of APs returned by ``AP_recognition``, return the
     start and end row number in data.
@@ -101,11 +101,11 @@ def get_range(beat, dt, l_ap):
     :return:
     """
     # line number of data file starts from 1, so minus 1 here
-    if int(l_ap[beat][0] / dt) == 0:
+    if int((l_ap[beat][0]-time_offset) / dt) == 0:
         beat_start = 0
     else:
-        beat_start = int(l_ap[beat][0] / dt) - 1
-    beat_end = int(l_ap[beat][0] / dt + l_ap[beat][1] / dt) - 1
+        beat_start = int((l_ap[beat][0]-time_offset) / dt) - 1
+    beat_end = int((l_ap[beat][0]-time_offset) / dt + l_ap[beat][1] / dt) - 1
     return beat_start, beat_end
 
 
@@ -158,7 +158,7 @@ def measure(infilename, celltype='n'):
         # First loop. Calculate characteristics except APDs
         for beat in range(0, num_bcl):
 
-            beat_start, beat_end = get_range(beat, dt, l_ap)
+            beat_start, beat_end = get_range(beat, dt, l_ap, data[0][i_t])
 
             # In a single beat
             min_ap_beforepeak = +1000
@@ -203,7 +203,7 @@ def measure(infilename, celltype='n'):
         # Second loop. Calculate APDs
         for beat in range(0, num_bcl):
 
-            beat_start, beat_end = get_range(beat, dt, l_ap)
+            beat_start, beat_end = get_range(beat, dt, l_ap, data[0][i_t])
 
             # In a single beat
             ap_90 = result[beat, 3] - 0.9 * (result[beat, 3] - result[beat, 2])
