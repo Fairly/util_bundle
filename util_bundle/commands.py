@@ -100,6 +100,8 @@ def clean_result_for_plot(filename, add_underline=False, truncate_to=None, shrin
     backup_file_name = filename + '.backup.dat'
     tmp_file_name = filename + 'tmp.dat'
 
+    print('Processing: ' + filename, end='; ', flush=True)
+
     shutil.copyfile(filename, backup_file_name)  # backup
     shutil.move(filename, tmp_file_name)
 
@@ -173,6 +175,7 @@ def clean_result_for_plot(filename, add_underline=False, truncate_to=None, shrin
 
     # all operations done
     shutil.move(tmp_file_name, filename)
+    print('Done!')
 
 
 class equa(AbstractCommand):
@@ -496,6 +499,7 @@ Arguments:
 
         result = []
         for fname in args['<FILE>']:
+            print('Processing file: ' + fname)
             _, m = read_data_file(fname)
 
             target = os.path.basename(fname)
@@ -1363,88 +1367,89 @@ Arguments:
             axes[0][1].legend()
 
         # Fig 10, Ca2+ handling #
-        elif f_num_inpaper == '10':
+        elif f_num_inpaper == 10:
             # FigA, Ca amplitude #
-            # __fig_size = [i / 4 for i in _fig_size]
-            # figa = plt.figure(figsize=__fig_size)
-            # figures.append(figa)
-            # axe = plt.subplot()
-            #
-            # data_amp = [[2.25, 0, "Model"], [2.4, 0.2, "Xie et al."], [2.38, 0.1, 'Li et al.']]
-            # # _width = 0.2  # width of a bar
-            # x_pos, _width = bar_arrange(len(data_amp))
-            # for i, _data in enumerate(data_amp):
-            #     if data_amp[i][2] == 'Model':  # has a revert color scheme
-            #         axe.bar(x_pos[0][i], data_amp[i][0],
-            #                 align='center', width=_width, color='k', linewidth=2)
-            #         axe.annotate(data_amp[i][2], xy=(x_pos[0][i], 0.05), xycoords='axes fraction',
-            #                      rotation='vertical', va='bottom', ha='center', color='w')
-            #     else:
-            #         axe.bar(x_pos[0][i], data_amp[i][0],
-            #                 align='center', width=_width, color='w', linewidth=2)
-            #         axe.annotate(data_amp[i][2], xy=(x_pos[0][i], 0.05), xycoords='axes fraction',
-            #                      rotation='vertical', va='bottom', ha='center')
-            #     axe.errorbar(x_pos[0][i], data_amp[i][0], yerr=data_amp[i][1], color='k', capthick=1.5)
-            #
-            # axe.set_xlim([0, 1])
-            # axe.set_xticks([])
-            # axe.set_ylabel("Amplitude (folds)")
-            # figa.tight_layout()
-            #
-            # # FigB, Ca time to peak #
-            # __fig_size = [i / 4 for i in _fig_size]
-            # figb = plt.figure(figsize=(__fig_size[0] * 1.18, __fig_size[1]))
-            # figures.append(figb)
-            # axe = plt.subplot()
-            #
-            # data_amp = [[22.2, 0, "Model"], [22.3, 1, "Mancarella et al."],
-            #             [22, 0, 'Li et al.'], [26, 0, 'Escobar et al.']]
-            # # _width = 0.2  # width of a bar
-            # x_pos, _width = bar_arrange(len(data_amp))
-            # for i, _data in enumerate(data_amp):
-            #     if data_amp[i][2] == 'Model':  # has a revert color scheme
-            #         axe.bar(x_pos[0][i], data_amp[i][0],
-            #                 align='center', width=_width, color='k', linewidth=2)
-            #         axe.annotate(data_amp[i][2], xy=(x_pos[0][i], 0.05), xycoords='axes fraction',
-            #                      rotation='vertical', va='bottom', ha='center', color='w')
-            #     else:
-            #         axe.bar(x_pos[0][i], data_amp[i][0],
-            #                 align='center', width=_width, color='w', linewidth=2)
-            #         axe.annotate(data_amp[i][2], xy=(x_pos[0][i], 0.05), xycoords='axes fraction',
-            #                      rotation='vertical', va='bottom', ha='center')
-            #     axe.errorbar(x_pos[0][i], data_amp[i][0], yerr=data_amp[i][1], color='k', capthick=1.5)
-            #
-            # axe.set_xlim([0, 1])
-            # axe.set_xticks([])
-            # axe.set_ylabel("Time to Peak (ms)")
-            # figb.tight_layout()
-            #
-            # # FigC, Ca decay, tau #
-            # __fig_size = [i / 4 for i in _fig_size]
-            # figc = plt.figure(figsize=(__fig_size[0] * 0.85, __fig_size[1]))
-            # figures.append(figc)
-            # axe = plt.subplot()
-            #
-            # data_amp = [[111, 0, "Model"], [112, 9, "Li et al."]]
-            # # _width = 0.2  # width of a bar
-            # x_pos, _width = bar_arrange(len(data_amp))
-            # for i, _data in enumerate(data_amp):
-            #     if data_amp[i][2] == 'Model':  # has a revert color scheme
-            #         axe.bar(x_pos[0][i], data_amp[i][0],
-            #                 align='center', width=_width, color='k', linewidth=2)
-            #         axe.annotate(data_amp[i][2], xy=(x_pos[0][i], 0.05), xycoords='axes fraction',
-            #                      rotation='vertical', va='bottom', ha='center', color='w')
-            #     else:
-            #         axe.bar(x_pos[0][i], data_amp[i][0],
-            #                 align='center', width=_width, color='w', linewidth=2)
-            #         axe.annotate(data_amp[i][2], xy=(x_pos[0][i], 0.05), xycoords='axes fraction',
-            #                      rotation='vertical', va='bottom', ha='center')
-            #     axe.errorbar(x_pos[0][i], data_amp[i][0], yerr=data_amp[i][1], color='k', capthick=1.5)
-            #
-            # axe.set_xlim([0, 1])
-            # axe.set_xticks([])
-            # axe.set_ylabel("Decay " + r"$\tau$" + " (ms)")
-            # figc.tight_layout()
+            __fig_size = [i / 4 for i in self._fig_size]
+            figa = plt.figure(figsize=__fig_size)
+            figures.append(figa)
+            axe = plt.subplot()
+
+            data_amp = [[2.25, 0, "Model"], [2.4, 0.2, "Xie et al."], [5.54, 0.37, 'Li et al.'],
+                        [6.33, 0.99, 'Guo et al.']]
+            # _width = 0.2  # width of a bar
+            x_pos, _width = bar_arrange(len(data_amp))
+            for i, _data in enumerate(data_amp):
+                if data_amp[i][2] == 'Model':  # has a revert color scheme
+                    axe.bar(x_pos[0][i], data_amp[i][0],
+                            align='center', width=_width, color='k', linewidth=2)
+                    axe.annotate(data_amp[i][2], xy=(x_pos[0][i], 0.05), xycoords='axes fraction',
+                                 rotation='vertical', va='bottom', ha='center', color='w')
+                else:
+                    axe.bar(x_pos[0][i], data_amp[i][0],
+                            align='center', width=_width, color='w', linewidth=2, edgecolor='k')
+                    axe.annotate(data_amp[i][2], xy=(x_pos[0][i], 0.05), xycoords='axes fraction',
+                                 rotation='vertical', va='bottom', ha='center')
+                    axe.errorbar(x_pos[0][i], data_amp[i][0], yerr=data_amp[i][1], color='k', capthick=1.5, capsize=3)
+
+            axe.set_xlim([0, 1])
+            axe.set_xticks([])
+            axe.set_ylabel("Amplitude (folds)")
+            figa.tight_layout()
+
+            # FigB, Ca time to peak #
+            __fig_size = [i / 4 for i in self._fig_size]
+            figb = plt.figure(figsize=(__fig_size[0] * 1.18, __fig_size[1]))
+            figures.append(figb)
+            axe = plt.subplot()
+
+            data_amp = [[22.2, 0, "Model"], [23.5, 2.3, "Mancarella et al."],
+                        [41.8, 1.8, 'Li et al.']]  # , [26, 0, 'Escobar et al.'], this is for rat, obsolete
+            # _width = 0.2  # width of a bar
+            x_pos, _width = bar_arrange(len(data_amp))
+            for i, _data in enumerate(data_amp):
+                if data_amp[i][2] == 'Model':  # has a revert color scheme
+                    axe.bar(x_pos[0][i], data_amp[i][0],
+                            align='center', width=_width, color='k', linewidth=2)
+                    axe.annotate(data_amp[i][2], xy=(x_pos[0][i], 0.05), xycoords='axes fraction',
+                                 rotation='vertical', va='bottom', ha='center', color='w')
+                else:
+                    axe.bar(x_pos[0][i], data_amp[i][0],
+                            align='center', width=_width, color='w', linewidth=2, edgecolor='k')
+                    axe.annotate(data_amp[i][2], xy=(x_pos[0][i], 0.05), xycoords='axes fraction',
+                                 rotation='vertical', va='bottom', ha='center')
+                    axe.errorbar(x_pos[0][i], data_amp[i][0], yerr=data_amp[i][1], color='k', capthick=1.5, capsize=3)
+
+            axe.set_xlim([0, 1])
+            axe.set_xticks([])
+            axe.set_ylabel("Time to Peak (ms)")
+            figb.tight_layout()
+
+            # FigC, Ca decay, tau #
+            __fig_size = [i / 4 for i in self._fig_size]
+            figc = plt.figure(figsize=(__fig_size[0] * 0.85, __fig_size[1]))
+            figures.append(figc)
+            axe = plt.subplot()
+
+            data_amp = [[111, 0, "Model"], [215, 17, "Li et al."]]
+            # _width = 0.2  # width of a bar
+            x_pos, _width = bar_arrange(len(data_amp))
+            for i, _data in enumerate(data_amp):
+                if data_amp[i][2] == 'Model':  # has a revert color scheme
+                    axe.bar(x_pos[0][i], data_amp[i][0],
+                            align='center', width=_width, color='k', linewidth=2)
+                    axe.annotate(data_amp[i][2], xy=(x_pos[0][i], 0.05), xycoords='axes fraction',
+                                 rotation='vertical', va='bottom', ha='center', color='w')
+                else:
+                    axe.bar(x_pos[0][i], data_amp[i][0],
+                            align='center', width=_width, color='w', linewidth=2, edgecolor='k')
+                    axe.annotate(data_amp[i][2], xy=(x_pos[0][i], 0.05), xycoords='axes fraction',
+                                 rotation='vertical', va='bottom', ha='center')
+                    axe.errorbar(x_pos[0][i], data_amp[i][0], yerr=data_amp[i][1], color='k', capthick=1.5, capsize=3)
+
+            axe.set_xlim([0, 1])
+            axe.set_xticks([])
+            axe.set_ylabel("Decay " + r"$\tau$" + " (ms)")
+            figc.tight_layout()
 
             # FigD, Frac Ca release #
             __fig_size = [i / 4 for i in self._fig_size]
@@ -1453,10 +1458,9 @@ Arguments:
             axe = plt.subplot()
 
             data_amp = [[0.485, 0, "Model"], [0.485, 0.015, 'Xie et al.'], [0.508, 0.04, 'Mancarella et al.'],
-                        [0.55, 0.05, "Li et al."], [0.3, 0.01, 'Walden et al.']]
+                        [0.55, 0.05, "Li et al."]]  # , [0.3, 0.01, 'Walden et al.'] this is for rat, so obsolete
             # _width = 0.2  # width of a bar
             x_pos, _width = bar_arrange(len(data_amp))
-            print(x_pos)
             for i, _data in enumerate(data_amp):
                 if _data[2] == 'Model':  # has a revert color scheme
                     axe.bar(x_pos[0][i], data_amp[i][0],
