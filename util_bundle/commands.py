@@ -1,5 +1,6 @@
 import os
 import shutil
+import sys
 from concurrent.futures import ThreadPoolExecutor
 from multiprocessing import cpu_count
 from subprocess import call
@@ -537,7 +538,7 @@ Arguments:
 
 class datareduce(AbstractCommand):
     """
-usage: datareduce [-s=num] [-m=mode] -y=yaxis <FILE>...
+usage: datareduce [-s=num] [-y=yaxis] [-m=mode] [--sort-alternans] <FILE>...
 
 Options:
     -s=num      An integer define which part will be extracted from the file name
@@ -545,18 +546,26 @@ Options:
                 and this parameter is set to 1, 's1s2-25' will be extracted and used
                 as the first column in the output. [default: 1]
     -y=yaxis    A ',' separate string specifying the column(s) used for the y-axis.
-    -m=mode     Mode can be `l` for last, `b` for biggest, or `s` for smallest. This
+                'ALL' means reduce all columns. [default: ALL]
+    -m=mode     Mode can be `t` for tail, `l` for largest, or `s` for smallest. This
                 parameter sets the behaviour of extracting which value out from the
-                yaxis. So it can extract the last, biggest or smallest value. [default: l]
+                yaxis. So it can extract the last, biggest, or smallest value. A number
+                can follow the `mode` to extract more than 1 values from the file. [default: t]
+    --sort-alternans
+                If alternans are in the result files, more than 1 values will be extracted from
+                the result files to plot the bifurcation. This option sort the values to
+                avoid crossings in the output curves. [default: false]
 
 Arguments:
     <FILE>      File names.
     """
+
     def execute(self):
         schema = Schema({
             '-s': Use(int),
             '-y': str,
             '-m': str,
+            '--sort-alternans': bool,
             '<FILE>': [os.path.isfile],
         })
 
@@ -567,7 +576,15 @@ Arguments:
         target = name.split('_')[args['-s']]
         xaxis_name = target[:target.find('-')]
 
-        yaxis_name = args['-y'].split(',')
+        # number of values extracted
+        n = 1
+        if len(args['-m']) > 1:
+            n = int(args['-m'][1:])
+
+        if args['-y'] == 'ALL':
+            yaxis_name, _ = read_data_file(first_filename)
+        else:
+            yaxis_name = args['-y'].split(',')
 
         result = []
         for fname in args['<FILE>']:
@@ -577,27 +594,50 @@ Arguments:
             target = os.path.basename(fname)
             target = os.path.splitext(target)[0]
             target = target.split('_')[args['-s']]
-            xaxis = target[target.find('-')+1:]
+            xaxis = target[target.find('-') + 1:]
             xaxis = float(xaxis)
 
             y_result = []
+            sort_flag = args['--sort-alternans']
+            import heapq        # using heap sort for nth-largest and nth-smallest
             for _y_name in yaxis_name:
-                if args['-m'] == 'l':
-                    y_value = m[-1][_y_name]
-                elif args['-m'] == 'b':
-                    y_value = max(m[_y_name])
-                elif args['-m'] == 's':
-                    y_value = min(m[_y_name])
+                if args['-m'].startswith('t'):
+                    if sort_flag:
+                        tmp = []
+                        for i in range(n):
+                            tmp.append(m[-1-i][_y_name])
+                        y_result.extend(sorted(tmp))
+                    else:
+                        for i in range(n):
+                            y_result.append(m[-1-i][_y_name])
+                elif args['-m'].startswith('l'):
+                    if n == 1:
+                        y_result.append(max(m[_y_name]))
+                    else:
+                        y_result.extend(heapq.nlargest(n, m[_y_name]))
+                elif args['-m'].startswith('s'):
+                    if n == 1:
+                        y_result.append(min(m[_y_name]))
+                    else:
+                        y_result.extend(heapq.nsmallest(n, m[_y_name]))
                 else:
-                    y_value = 0.0
-
-                y_result.append(y_value)
+                    print('Unsupported mode "' + args['-m'] + '". Exit.', file=sys.stderr)
 
             result.append([xaxis, *y_result])
 
+        # duplicate yaxis names if more than 1 value extracted
+        new_yaxis = []
+        if n > 1:
+            for _y_name in yaxis_name:
+                for i in range(n):
+                    new_yaxis.append(_y_name + '_' + str(i))
+
         result.sort()
-        save_data_file(os.path.join(path, xaxis_name + '-' + '+'.join(yaxis_name) + '.dat'),
-                       [xaxis_name, *yaxis_name], result)
+        if args['-y'] == 'ALL':
+            outfilename = os.path.join(path, 'datareduce_ALL.dat')
+        else:
+            outfilename = os.path.join(path, 'datareduce_' + xaxis_name + '-' + '+'.join(yaxis_name) + '.dat')
+        save_data_file(outfilename, [xaxis_name, *new_yaxis], result)
 
 
 class eplot(AbstractCommand):
@@ -996,7 +1036,6 @@ Arguments:
                 Specify a range of BCLs.
     """
 
-    # TODO update with smt?
     def execute(self):
         schema = Schema({
             '--step': Use(float),
