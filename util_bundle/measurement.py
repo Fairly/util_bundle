@@ -50,7 +50,6 @@ def ap_recognition(data, time_prefix='t', stim_prefix='I_Stim'):
     Raise:
         DataError
     """
-    # TODO Only support non-pacemaking cells
     time_name = ''
     dvdt_name = ''
     for header in data.dtype.names:
@@ -355,20 +354,14 @@ def measure(infilename, celltype='n'):
     # print result
 
     # Output results
-    if '.' in infilename:
-        index_suffix = infilename.rfind('.')
-        suffix = infilename[index_suffix:]
-        out_file_name = infilename.replace(suffix, '_measurement.dat')
-    else:
-        out_file_name = infilename + '_measurement.dat'
+    infilepath, _infilename = os.path.split(infilename)
+    out_file_name = 'measurement_' + _infilename
+    out_file_name = os.path.join(infilepath, out_file_name)
 
-    out_file_name = os.path.join(os.getcwd(), out_file_name)
     # Construct headers
     result_header = '\t'.join(result_header_list)
     # Save
-    np.savetxt(out_file_name, result, fmt="%.4f",
-               delimiter='\t', header=result_header, comments='')
-    #
+    np.savetxt(out_file_name, result, fmt="%.4f", delimiter='\t', header=result_header, comments='')
 
     print("measurement of %s is done." % infilename)
 
