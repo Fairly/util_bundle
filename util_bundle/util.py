@@ -35,9 +35,9 @@ def save_data_file(filename, header, data):
     """
     if header is not None:
         header_ = '\t'.join(header)
-        np.savetxt(filename, data, fmt='%.5g', delimiter='\t', comments='', newline='\n', header=header_)
+        np.savetxt(filename, data, fmt='%.7g', delimiter='\t', comments='', newline='\n', header=header_)
     else:
-        np.savetxt(filename, data, fmt='%.5g', delimiter='\t', comments='', newline='\n')
+        np.savetxt(filename, data, fmt='%.7g', delimiter='\t', comments='', newline='\n')
 
 
 # Plot utils
