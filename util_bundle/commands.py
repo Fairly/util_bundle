@@ -34,7 +34,7 @@ class AbstractCommand:
         self.global_args = global_args
 
         # deal with wildcards in Windows
-        if '<FILE>' in self.args and self.args['<FILE>']\
+        if '<FILE>' in self.args and self.args['<FILE>'] \
                 and ('*' in self.args['<FILE>'][0]
                      or '?' in self.args['<FILE>'][0]
                      or '[' in self.args['<FILE>'][0]
@@ -75,6 +75,7 @@ Arguments:
         args = schema.validate(self.args)
 
         p = ThreadPoolExecutor(cpu_count()) if args['-m'] else ThreadPoolExecutor(1)
+
         if args['-d']:
             # given a directory, measure all files in it
             onlyfiles = [os.path.join(args['-d'], f)
@@ -86,7 +87,7 @@ Arguments:
         else:
             # given a list of files
             for f in args['<FILE>']:
-                measurement.measure(f, args['-t'])
+                p.submit(measurement.measure, f, args['-t'])
 
 
 def clean_result_for_plot(filename, add_underline=False, truncate_to=None, shrink=None,
@@ -136,7 +137,7 @@ def clean_result_for_plot(filename, add_underline=False, truncate_to=None, shrin
             import platform
             if platform.system() == 'Windows':
                 for i, line in enumerate(open(tmp_file_name, 'r')):
-                    if i == 0 or (i-1) % multiplier == 0:
+                    if i == 0 or (i - 1) % multiplier == 0:
                         print(line.strip(), file=to_file)
             else:
                 # save the first and second line, then every `multiplier`th line to file
@@ -187,6 +188,26 @@ Options:
     re_fnum = r'(-?\d+(\.\d+)?)([Ee]-?\d+(\.\d+)?)?'  # floating point number in C
 
     @staticmethod
+    def find_paired_parenthesis(s):
+        """
+        Return the position of the paired parenthesis.
+        :param s: a string starting with '(' and has its matching ')'.
+        """
+        rs = list(s)
+        nest_tier = 0
+        pos = 0
+        for i in range(1, len(rs)):
+            if rs[i] == '(':
+                nest_tier += 1
+            elif rs[i] == ')':
+                if nest_tier > 0:
+                    nest_tier -= 1
+                else:
+                    pos = i
+                    break
+        return pos
+
+    @staticmethod
     def changebrace(s):
         """
         Change parentheses operators in C to braces in Latex.
@@ -205,7 +226,7 @@ Options:
                     rs[i] = '}'
                     break
         return ''.join(rs)
-    
+
     @staticmethod
     def countleft(s):
         """
@@ -215,7 +236,7 @@ Options:
         if s[-2] == ')':
             s = s[:-1]
             nest_tier = 0
-            for i in range(len(s)-1, 0, -1):
+            for i in range(len(s) - 1, 0, -1):
                 rtn_len += 1
                 if s[i] == ')':
                     nest_tier += 1
@@ -231,11 +252,11 @@ Options:
                             i -= 1
                         break
         else:
-            p = re.compile(r'(?<=[^\w.])([\w.{}\\-]+)(?=/)')
+            p = re.compile(r'(?<=[^\w.])([\w.{}]+)(?=/)')   # todo be aware, may cause problem when '-' is in the term
             m = re.search(p, s)
             rtn_len = len(m.group())
         return rtn_len
-        
+
     @staticmethod
     def countright(s):
         rtn_len = 0
@@ -264,24 +285,46 @@ Options:
 
         for filename in args['<FILE>']:
             fin = open(filename, 'r')
-            fout = open(filename+'.tex', 'w')
+            fout = open(filename + '.tex', 'w')
+
+            print(r"\documentclass{article}", file=fout)
+            print(r"\usepackage[fleqn] {amsmath}", file=fout)
+            print(file=fout)
+            print(r"\begin {document}", file=fout)
+            print(r"\begin {align*}", file=fout)
 
             for line in fin:
-                line = re.sub(r'//.*', '', line)
                 line = line.strip()
+                if line.startswith('//'):
+                    continue
                 if len(line) == 0:
-                    print('', file=fout)
+                    print(r'\\', file=fout)
                     continue
                 if line[0] == '%':
                     print(line, file=fout)
                     continue
 
+                # extract unit
+                p = re.compile(r'.*//.*\[(.*)\].*$')
+                m = re.match(p, line)
+                if m:
+                    s_unit = r'\ [' + m.group(1) + ']'
+                else:
+                    s_unit = ''
+
                 # clean
-                line = re.sub(r';$', '', line)
+                line = re.sub(r'//.*', '', line)
+                line = re.sub(r'\s*;\s*$', '', line)
                 line = re.sub(r'^double ', '', line)
                 line = re.sub(r'^float ', '', line)
                 line = re.sub(r'^int ', '', line)
                 line = line.replace(' ', '')
+                line = line.replace('sh.', '')
+                line = line.replace('sh->', '')
+                line = line.replace('ec->', '')
+                line = line.replace('ec.', '')
+                line = line.replace('ph->', '')
+                line = line.replace('ph.', '')
 
                 # deal with fractions
                 pos = 0
@@ -291,41 +334,58 @@ Options:
                         break
 
                     pos = start + 1
-                    div_left = self.countleft(line[:start+1])
+                    div_left = self.countleft(line[:start + 1])
                     div_right = self.countright(line[start:])
 
                     if div_left > 20 or div_right > 20:
-                        numerator = line[start-div_left:start]
+                        numerator = line[start - div_left:start]
                         if numerator[0] == '(' and numerator[-1] == ')':
                             numerator = numerator[1:-1]
 
-                        denominator = line[start+1:start+div_right]
+                        denominator = line[start + 1:start + div_right + 1]
                         if denominator[0] == '(' and denominator[-1] == ')':
                             denominator = denominator[1:-1]
 
                         frac = r'\frac {' + numerator + '}{' + denominator + '}'
-                        line = line[:start-div_left] + frac + line[start+div_right:]
+                        line = line[:start - div_left] + frac + line[start + div_right + 1:]
 
                 # deal with functions
                 while line.find('exp') != -1:
                     start = line.find('exp')
-                    if line[start+3] == '(':
-                        line = line[:start+3] + self.changebrace(line[start+3:])
+                    if line[start + 3] == '(':
+                        line = line[:start + 3] + self.changebrace(line[start + 3:])
                     line = line.replace('exp', 'e^', 1)
+                while line.find('pow') != -1:
+                    start = line.find('pow')
+                    if line[start + 3] == '(':
+                        end = self.find_paired_parenthesis(line[start + 3:]) + 4 + start
+                        target = line[start:end]
+                        target = target.replace('pow(', '')
+                        target = re.sub(r',([\w]+)\)$', r'^{\1}', target)
+                        line = line[:start] + target + line[end:]
+
+                # add dot on heads of derivatives
+                line = re.sub(r'ec_dot\.([\w]+)', r'\\dot{\1}', line)
+                line = re.sub(r'ec_dot->([\w]+)', r'\\dot{\1}', line)
+                line = re.sub(r'ecR->([\w]+)', r'\\dot{\1}', line)
 
                 # deal with subscripts
-                p = re.compile('(?<=_)([\w]+)(?=[\W_]?)')
+                p = re.compile('(?<=[\w]_)([\w]+)(?=[\W_]?)')
                 line = re.sub(p, r'{\1}', line)
+                p = re.compile('(?<=_){([\w]+)_}')
+                line = re.sub(p, r'{\1}_', line)
+                p = re.compile('_([^{_]+)')  # avoid nested subscripts
+                line = re.sub(p, r'\_\1', line)
 
                 # deal with '*' operators, try to remove redundant '*'
-                lp = re.compile(self.re_fnum + r'\s*\Z')
+                lp = re.compile(r'(?<=\W)' + self.re_fnum + r'\s*\Z')
                 rp = re.compile(r'\A\s*' + self.re_fnum)
                 while line.find('*') != -1:
                     pos = line.find('*')
                     lm = re.search(lp, line[:pos])  # check left, if is a C number
-                    rm = re.search(rp, line[pos+1:])  # check right, if is not a C number
-                    if lm is not None and rm is None and not line[pos+1:].startswith(r'\frac'):
-                        line = line.replace('*', '', 1)  # remove this redundant '*'
+                    rm = re.search(rp, line[pos + 1:])  # check right, if is not a C number
+                    if lm is not None and rm is None and not line[pos + 1:].startswith(r'\frac'):
+                        line = line.replace('*', '\\,', 1)  # remove this redundant '*'
                     else:
                         line = line.replace('*', '\\times ', 1)
 
@@ -336,12 +396,24 @@ Options:
                 line = line.replace('beta', '\\beta ')
                 line = line.replace('gamma', '\\gamma ')
                 line = line.replace('delta', '\\delta ')
+                line = line.replace('mu', '\\mu ')
+                line = line.replace('sigma', '\\sigma ')
 
                 # scientific notation
                 line = re.sub(r'(-?\d+(\.\d+)?)([Ee])(-?\d+(\.\d+)?)', r'\1\\times 10^{\4}', line)
 
-                print(r'\[' + line + r'\]', file=fout)
+                if line.startswith('if'):
+                    line = line.replace('if', '')
+                    line = line.replace(r'{', '')
+                    line = line.replace('\n', '')
+                    print('IF $', line, '$', file=fout)
+                elif line == '}':
+                    print(r'ENDIF \\', file=fout)
+                else:
+                    print(r'&' + line + s_unit + r'\\', file=fout)
 
+            print("\end{align*}", file=fout)
+            print("\end{document}", file=fout)
             fin.close()
             fout.close()
 
@@ -583,7 +655,7 @@ Arguments:
                 except:
                     continue
 
-                plt.plot(data[x], data[y.replace('.', '')], label=f+' '+y)
+                plt.plot(data[x], data[y.replace('.', '')], label=f + ' ' + y)
 
         plt.legend()
         plt.show()
@@ -753,6 +825,34 @@ Arguments:
   <FILE>...   Result files specified.
   <START> <END>
               Starting and ending lines of data of the interested time interval in this voltage clamp.
+
+
+Examples:
+    File1: result_BCL-100.dat
+    File2: result_BCL-1000.dat
+
+    result_BCL-100.dat:
+    t       I_Na    ...
+    0.1     1
+    0.2     3
+    0.3     5
+    ...     ...
+
+    result_BCL-1000.dat:
+    t       I_Na    ...
+    0.1     10
+    0.2     30
+    0.3     50
+    ...     ...
+
+    If run `vclean -s 1 -y I_Na result*` ('*' is the wildcard, supported on both Linux
+    and Win), the resultant file will be:
+
+    t       BCL-100     BCL-1000
+    0.1     1           10
+    0.2     3           30
+    0.3     5           50
+    ...     ...         ...
     """
 
     def execute(self):
