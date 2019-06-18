@@ -1,6 +1,7 @@
 import os
 import shutil
 import sys
+import concurrent.futures
 from concurrent.futures import ThreadPoolExecutor
 from multiprocessing import cpu_count
 from subprocess import call
@@ -75,20 +76,21 @@ Arguments:
 
         args = schema.validate(self.args)
 
-        p = ThreadPoolExecutor(cpu_count()) if args['-m'] else ThreadPoolExecutor(1)
-
         if args['-d']:
             # given a directory, measure all files in it
             onlyfiles = [os.path.join(args['-d'], f)
                          for f in os.listdir(args['-d'])
                          if os.path.isfile(os.path.join(args['-d'], f))]
             current_files = [f for f in onlyfiles if f.endswith(args['-s'])]
-
-            p.map(measurement.measure, current_files, args['-t'])
         else:
-            # given a list of files
-            for f in args['<FILE>']:
-                p.submit(measurement.measure, f, args['-t'])
+            current_files = args['<FILE>']
+
+        thread_num = cpu_count() if args['-m'] else 1
+        print(thread_num)
+        with ThreadPoolExecutor(thread_num) as executor:
+            future_list = [executor.submit(measurement.measure, f, args['-t']) for f in current_files]
+            for _ in concurrent.futures.as_completed(future_list):
+                continue
 
 
 def clean_result_for_plot(filename, add_underline=False, truncate_to=None, shrink=None,
