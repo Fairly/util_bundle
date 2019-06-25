@@ -86,7 +86,6 @@ Arguments:
             current_files = args['<FILE>']
 
         thread_num = cpu_count() if args['-m'] else 1
-        print(thread_num)
         with ThreadPoolExecutor(thread_num) as executor:
             future_list = [executor.submit(measurement.measure, f, args['-t']) for f in current_files]
             for _ in concurrent.futures.as_completed(future_list):
@@ -647,9 +646,13 @@ class eplot(AbstractCommand):
 An easy plot command for single data files. Unlike `qplot`, this command is designed to plot compact data
 in each file, not extracted data from a series of files.
 
-usage:  eplot  [-x=xaxis] -y=yaxis <FILE>...
+usage:  eplot  [-e=func] [-x=xaxis] -y=yaxis <FILE>...
 
 Options:
+    -e=func     A function with two arguments 'a' and 'b' that will be `eval`ed to generate results for plotting.
+                For example: "1 - a/b" means define a function as: "lambda a,b: 1-a/b". The two arguments
+                are actually two data fields in `yaxis`. `yaxis` will be consumed consecutively to fulfill
+                the arguments and generate results for plotting. No function is allowed being called in `func`.
     -x=xaxis    Specify the column used for the x-axis. `xaxis` can be a number (start from 0)
                 or the name of the column. [default: 0]
     -y=yaxis    A ',' separate string specifying the column(s) used for the y-axis. If set to 'all', all fields
@@ -660,6 +663,7 @@ Arguments:
     """
     def execute(self):
         schema = Schema({
+            '-e': Or(None, str),
             '-x': Or(int, str),
             '-y': str,
             '<FILE>': [os.path.isfile],
@@ -667,6 +671,7 @@ Arguments:
 
         args = schema.validate(self.args)
 
+        plt.figure()
         # read files
         for f in args['<FILE>']:
             try:
@@ -684,22 +689,32 @@ Arguments:
 
             l_y = args['-y'].split(',')
             for i, y in enumerate(l_y):
-                if y.isdigit():
+                if y.isdigit():     # change number of columns into the header string of columns
                     l_y[i] = header[int(y)]
                 else:
                     pass
 
+            func = eval("lambda a, b: " + args['-e'])
+
             # plot
-            plt.figure()
-            for y in l_y:
-                try:
-                    tmp = data[y.replace('.', '')]  # if this file has no column named y, skip the plot
-                except:
-                    continue
+            x = data[x]
+            for i in range(len(l_y)):
+                if args['-e']:  # if self defined function
+                    if len(l_y) - i < 2:
+                        break
+                    y0 = data[l_y[i].replace('.', '')]
+                    y1 = data[l_y[i+1].replace('.', '')]
+                    y = func(y0, y1)
+                    i += 2
+                else:           # else, sequentially plot
+                    try:
+                        y = data[l_y[i].replace('.', '')]
+                    except ValueError:
+                        print(l_y[i], ' is not in file: ', f, '. Ignore.')
+                        continue
+                plt.plot(x, y)
 
-                plt.plot(data[x], data[y.replace('.', '')], label=f + ' ' + y)
-
-        plt.legend()
+        # plt.legend()
         plt.show()
 
 
