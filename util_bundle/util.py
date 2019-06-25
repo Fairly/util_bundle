@@ -7,18 +7,24 @@ import numpy as np
 def read_data_file(filename, max_rows=None):
     with open(filename, 'r') as f_in:
         first_line = f_in.readline().strip()
-        first_field = first_line.split('\t')[0]
 
+        # detect the delimiter
+        if len(first_line.split(' ')) > len(first_line.split('\t')):
+            delimiter = ' '
+        else:
+            delimiter = '\t'
+
+        first_field = first_line.split(delimiter)[0]
         try:  # no header
             float(first_field)
-            npa_data = np.genfromtxt(filename, delimiter="\t", dtype='f8', max_rows=max_rows)
+            npa_data = np.genfromtxt(filename, delimiter=delimiter, dtype='f8', max_rows=max_rows)
             l_labels = None
         except ValueError:  # with header
-            npa_data = np.genfromtxt(filename, delimiter="\t", dtype='f8', names=True, max_rows=max_rows)
+            npa_data = np.genfromtxt(filename, delimiter=delimiter, dtype='f8', names=True, max_rows=max_rows)
 
             f_in.seek(0)
             header = f_in.readline().strip()
-            l_labels = header.split('\t')
+            l_labels = header.split(delimiter)
             l_labels = [_label.strip() for _label in l_labels]
 
             # The number of data fields may exceed the number of headers, remove the last column
