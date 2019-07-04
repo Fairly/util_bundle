@@ -17,20 +17,20 @@ def read_data_file(filename, max_rows=None):
         first_field = first_line.split(delimiter)[0]
         try:  # no header
             float(first_field)
-            npa_data = np.genfromtxt(filename, delimiter=delimiter, dtype='f8', max_rows=max_rows)
-            l_labels = None
+            # generate a header for the file, this assures the consistence of returned data
+            num_fields = len(first_line.split(delimiter))
+            l_labels = [str(i) for i in range(num_fields)]
+            npa_data = np.genfromtxt(filename, delimiter=delimiter, dtype='f8', names=l_labels, max_rows=max_rows)
         except ValueError:  # with header
             npa_data = np.genfromtxt(filename, delimiter=delimiter, dtype='f8', names=True, max_rows=max_rows)
 
-            f_in.seek(0)
-            header = f_in.readline().strip()
-            l_labels = header.split(delimiter)
+            l_labels = first_line.split(delimiter)
             l_labels = [_label.strip() for _label in l_labels]
 
-            # The number of data fields may exceed the number of headers, remove the last column
-            if len(l_labels) < len(npa_data[0]):
-                names = list(npa_data.dtype.names)[:len(l_labels)]
-                npa_data = npa_data[names]
+        # The number of data fields may exceed the number of headers, remove last several columns
+        if len(l_labels) < len(npa_data[0]):
+            names = list(npa_data.dtype.names)[:len(l_labels)]
+            npa_data = npa_data[names]
 
         return l_labels, npa_data
 
