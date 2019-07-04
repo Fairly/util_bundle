@@ -646,13 +646,18 @@ class eplot(AbstractCommand):
 An easy plot command for single data files. Unlike `qplot`, this command is designed to plot compact data
 in each file, not extracted data from a series of files.
 
-usage:  eplot  [-e=func] [-x=xaxis] -y=yaxis <FILE>...
+usage:
+    eplot  [-f] [-e=func] [-L=labels] [-x=xaxis] -y=yaxis <FILE>...
 
 Options:
+    -f          New figure for each file and all `yaxis` in one figure. If not, new figure for each `yaxis`,
+                and the columns named `yaxis` in every file will be on one figure.
     -e=func     A function with two arguments 'a' and 'b' that will be `eval`ed to generate results for plotting.
                 For example: "1 - a/b" means define a function as: "lambda a,b: 1-a/b". The two arguments
                 are actually two data fields in `yaxis`. `yaxis` will be consumed consecutively to fulfill
                 the arguments and generate results for plotting. No function is allowed being called in `func`.
+    -L=labels   Legends used in plotting, since these legends can either be for each file or for each `yaxis` (see
+                `-f`) , this option is different to the `-L` in `qplot`. It should be a ',' separate string.
     -x=xaxis    Specify the column used for the x-axis. `xaxis` can be a number (start from 0)
                 or the name of the column. [default: 0]
     -y=yaxis    A ',' separate string specifying the column(s) used for the y-axis. If set to 'all', all fields
@@ -663,58 +668,80 @@ Arguments:
     """
     def execute(self):
         schema = Schema({
+            '-f': bool,
             '-e': Or(None, str),
             '-x': Or(int, str),
             '-y': str,
+            '-L': Or(None, str),
             '<FILE>': [os.path.isfile],
         })
 
         args = schema.validate(self.args)
 
-        plt.figure()
-        # read files
-        for f in args['<FILE>']:
-            try:
-                header, data = read_data_file(f)
-            except:
-                print('Read file error for file: {}. Continue.'.format(f))
-                continue
-
-            # parse xaxis and yaxis
-            x = args['-x']
-            if x.isdigit():
-                x = header[int(x)]
-            else:
-                pass
-
-            l_y = args['-y'].split(',')
-            for i, y in enumerate(l_y):
-                if y.isdigit():     # change number of columns into the header string of columns
-                    l_y[i] = header[int(y)]
-                else:
-                    pass
-
+        if args['-e']:
             func = eval("lambda a, b: " + args['-e'])
 
-            # plot
-            x = data[x]
+        legends = []
+        if args['-L']:
+            legends = args['-L'].strip().split(',')
+
+        import plot
+        data = plot.gen_plot_data(args['<FILE>'])
+
+        # re-asign the name of x-axis
+        for _d in data:
+            _d['xaxis'] = args['-x']
+
+        # deal with the names of y-axis
+        header = data[0]['l_field_names']
+        if args['-y'] == 'all':
+            l_y = header
+        else:
+            l_y = args['-y'].split(',')
+            for i, y in enumerate(l_y):
+                if y.isdigit():  # change number of columns into the header string of columns
+                    l_y[i] = header[int(y)]
+
+        # pack data into simpler structures
+        xaxis_infiles = [_d['data'][_d['xaxis']] for _d in data]    # list of a column in ndarray
+        yaxis_infiles = []                                          # list of list of columns in ndarray
+        for j, _d in enumerate(data):
+            yaxis_in_single_file = []
             for i in range(len(l_y)):
                 if args['-e']:  # if self defined function
                     if len(l_y) - i < 2:
                         break
-                    y0 = data[l_y[i].replace('.', '')]
-                    y1 = data[l_y[i+1].replace('.', '')]
+                    y0 = _d['data'][l_y[i].replace('.', '')]
+                    y1 = _d['data'][l_y[i + 1].replace('.', '')]
                     y = func(y0, y1)
                     i += 2
-                else:           # else, sequentially plot
+                else:  # else, sequentially plot
                     try:
-                        y = data[l_y[i].replace('.', '')]
+                        y = _d['data'][l_y[i].replace('.', '')]
                     except ValueError:
-                        print(l_y[i], ' is not in file: ', f, '. Ignore.')
+                        print(l_y[i], ' is not in the file. Ignore.')
                         continue
-                plt.plot(x, y)
+                yaxis_in_single_file.append(y)
+            yaxis_infiles.append(yaxis_in_single_file)
 
-        # plt.legend()
+        # plot
+        l_figure = []
+        if args['-f']:
+            for i, _x in enumerate(xaxis_infiles):
+                l_figure.append(plt.figure())
+                for j, _y in enumerate(yaxis_infiles[i]):
+                    plt.plot(_x, _y, label=legends[j])
+        else:
+            for i in range(len(yaxis_infiles[0])):
+                l_figure.append(plt.figure())
+                for j, _x in enumerate(xaxis_infiles):
+                    plt.plot(_x, yaxis_infiles[j][i], label=legends[j])
+
+        if args['-L']:
+            for _figure in l_figure:
+                axes = _figure.get_axes()
+                for _a in axes:
+                    _a.legend()
         plt.show()
 
 
@@ -783,6 +810,10 @@ Arguments:
         args = schema.validate(self.args)
 
         header, _ = read_data_file(args['<FILE>'][0], max_rows=2)
+
+        if header is None:
+            print("Result file does not have a header. Use `eplot` instead.", file=sys.stderr)
+            exit(1)
 
         plot_flag = []
         if args['-A']:

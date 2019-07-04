@@ -97,7 +97,7 @@ def catagrize_data(data):
     return data
 
 
-def gen_data(l_input_filename, l_labels=None):
+def gen_plot_data(l_input_filename, l_labels=None):
     """
     This function is not stable now.
     Stacks all data in different files into a single data structure.
@@ -115,13 +115,19 @@ def gen_data(l_input_filename, l_labels=None):
                      'l_field_names': l_field_names,
                      'label': l_labels[i] if l_labels else None})
 
+        # determine the column of x-axis
+        flag = False
         for field in data[i]['l_field_names']:
             # find the first field starts with 't' or 'T' as the xaxis
             if field.startswith(('t', 'T')):
                 data[i]['xaxis'] = field
+                flag = True
                 break
+        if flag:    # if not found
+            data[i]['xaxis'] = data[i]['l_field_names'][0]
 
-        if len(data[i]['l_field_names']) < len(data[i]['data'][0]):
+        # check the length of header and data (if header exists)
+        if data[i]['l_field_names'] and len(data[i]['l_field_names']) < len(data[i]['data'][0]):
             raise Exception("\nErr: The data file named %s has something wrong.\n" % filename +
                             "Err: The length of its header is less than the length of data fields.")
 
@@ -204,7 +210,7 @@ def autoplot(l_input_filename, l_label=None, xaxis=None, flags=('all',),
     if mplsetting:
         mpl_setting.set_matplotlib_default()
 
-    data = gen_data(l_input_filename, l_label)
+    data = gen_plot_data(l_input_filename, l_label)
 
     if xaxis is not None:
         for d in data:
@@ -266,7 +272,7 @@ def autoplot(l_input_filename, l_label=None, xaxis=None, flags=('all',),
 
 
 def ros_cell_plot(l_input_filenames, l_legends):
-    d = gen_data(l_input_filenames, l_legends)
+    d = gen_plot_data(l_input_filenames, l_legends)
 
     fig = plt.figure(1, figsize=(3.24, 4), dpi=300)
     plt.rc('text', usetex=True)
