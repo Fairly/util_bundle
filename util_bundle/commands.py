@@ -1847,3 +1847,47 @@ Arguments:
 
         import image_preprocessing
         image_preprocessing.do(args)
+
+
+class collectvtk(AbstractCommand):
+    """
+usage:  collectvtk <DIR>
+
+Arguments:
+  <DIR>       The directory containing images.
+    """
+    def execute(self):
+        schema = Schema({
+            '<DIR>': os.path.isdir,
+        })
+
+        args = schema.validate(self.args)
+
+        save_dir = os.path.join(args['<DIR>'], 'vtk_files')
+        if not os.path.isdir(save_dir):
+            os.mkdir(save_dir)
+
+        AP_dir = os.path.join(save_dir, 'AP')
+        if not os.path.isdir(AP_dir):
+            os.mkdir(AP_dir)
+
+        Cai_dir = os.path.join(save_dir, 'Cai')
+        if not os.path.isdir(Cai_dir):
+            os.mkdir(Cai_dir)
+
+        content = os.listdir(args['<DIR>'])
+        for _name in content:
+            AP_vtk = os.path.join(args['<DIR>'], _name, 'OneD.vtk')
+            if os.path.isfile(AP_vtk):
+                shutil.copy(AP_vtk, os.path.join(AP_dir, _name + '.vtk'))
+
+            Cai_vtk = os.path.join(args['<DIR>'], _name, 'OneD_Cai.vtk')
+            if os.path.isfile(Cai_vtk):
+                shutil.copy(Cai_vtk, os.path.join(Cai_dir, _name + '.vtk'))
+
+
+class cvtk(AbstractCommand):
+    def __init__(self, command_args, global_args):
+        cvtk.__doc__ = collectvtk.__doc__
+        cvtk.execute = collectvtk.execute
+        super().__init__(command_args, global_args)

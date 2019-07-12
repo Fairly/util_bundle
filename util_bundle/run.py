@@ -20,6 +20,8 @@ Command:
 
   con3d         Do 3D geometry construction.
   prep          Pre-process original images.
+  collectvtk    Collect all .vtk files from subdirectories then save in a separate dir.
+  cvtk          Short for collectvtk.
 
 Options:
   -h, --help    Print the help message.
