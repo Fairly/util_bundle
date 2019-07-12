@@ -123,7 +123,7 @@ def gen_plot_data(l_input_filename, l_labels=None):
                 data[i]['xaxis'] = field
                 flag = True
                 break
-        if flag:    # if not found
+        if not flag:    # if not found
             data[i]['xaxis'] = data[i]['l_field_names'][0]
 
         # check the length of header and data (if header exists)
