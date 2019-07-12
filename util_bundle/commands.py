@@ -670,7 +670,7 @@ Arguments:
         schema = Schema({
             '-f': bool,
             '-e': Or(None, str),
-            '-x': Or(int, str),
+            '-x': Or(Use(int), str),
             '-y': str,
             '-L': Or(None, str),
             '<FILE>': [os.path.isfile],
@@ -690,7 +690,10 @@ Arguments:
 
         # re-asign the name of x-axis
         for _d in data:
-            _d['xaxis'] = args['-x']
+            if isinstance(args['-x'], int):
+                _d['xaxis'] = _d['l_field_names'][args['-x']]
+            else:
+                _d['xaxis'] = args['-x']
 
         # deal with the names of y-axis
         header = data[0]['l_field_names']
@@ -730,12 +733,12 @@ Arguments:
             for i, _x in enumerate(xaxis_infiles):
                 l_figure.append(plt.figure())
                 for j, _y in enumerate(yaxis_infiles[i]):
-                    plt.plot(_x, _y, label=legends[j])
+                    plt.plot(_x, _y, label=legends[j] if legends else None)
         else:
             for i in range(len(yaxis_infiles[0])):
                 l_figure.append(plt.figure())
                 for j, _x in enumerate(xaxis_infiles):
-                    plt.plot(_x, yaxis_infiles[j][i], label=legends[j])
+                    plt.plot(_x, yaxis_infiles[j][i], label=legends[j] if legends else None)
 
         if args['-L']:
             for _figure in l_figure:
