@@ -543,7 +543,7 @@ Arguments:
 
 class datareduce(AbstractCommand):
     """
-usage: datareduce [-s=num] [-y=yaxis] [-m=mode] [--sort-alternans] <FILE>...
+usage: datareduce [-s=num] [-y=yaxis] [-m=mode] [options] <FILE>...
 
 Options:
     -s=num      An integer define which part will be extracted from the file name
@@ -560,6 +560,9 @@ Options:
                 If alternans are in the result files, more than 1 values will be extracted from
                 the result files to plot the bifurcation. This option sort the values to
                 avoid crossings in the output curves. [default: false]
+    --drop-last
+                In tissue simulation, the last beat may not be complete. If this option is set,
+                the last line will be ignored, no matter complete or not. [default: false]
 
 Arguments:
     <FILE>      File names.
@@ -571,6 +574,7 @@ Arguments:
             '-y': str,
             '-m': str,
             '--sort-alternans': bool,
+            '--drop-last': bool,
             '<FILE>': [os.path.isfile],
         })
 
@@ -595,6 +599,9 @@ Arguments:
         for fname in args['<FILE>']:
             print('Processing file: ' + fname)
             _, m = read_data_file(fname)
+
+            if args['--drop-last']:
+                m = m[:-1]
 
             target = os.path.basename(fname)
             target = os.path.splitext(target)[0]
