@@ -41,7 +41,7 @@ def dt_recognition(data, time_prefix='t'):
     return dt
 
 
-def ap_recognition(data, time_prefix='t', stim_prefix='I_Stim'):
+def ap_recognition(data):
     """
 
     Return:
@@ -50,33 +50,27 @@ def ap_recognition(data, time_prefix='t', stim_prefix='I_Stim'):
     Raise:
         DataError
     """
-    time_name = ''
-    dvdt_name = ''
-    for header in data.dtype.names:
-        if header.startswith(time_prefix):
-            time_name = header
-        elif 'dvdt' in header.lower():
-            dvdt_name = header
-
-    if time_name == '' or dvdt_name == '':
-        raise DataError("Cannot find 'time' and 'dvdt' in the file. "
-                        "Are you using a wrong structure in the file?")
-
-    i_t = data.dtype.names.index(time_name)
-    i_dvdt = data.dtype.names.index(dvdt_name)
-
+    i_t, i_v, i_dvdt, _, _ = find_fields(data)
     start_points = []  # of APs
+    dt = dt_recognition(data)
+    jump_time = 5  # [ms]
+    jump_step = int(jump_time/dt)   # jump over a short time to avoid local maximum in rare cases
 
     # find all stimuli
     if_find_upstroke = False
-    for i, row in enumerate(data):
+    i = 0
+    while i < len(data):
+        row = data[i]
         if if_find_upstroke is False and row[i_dvdt] > 5:
             # spot a upstroke
             if_find_upstroke = True
             start_points.append(row[i_t])
+            i += jump_step
 
         elif if_find_upstroke is True and row[i_dvdt] < 0:
             if_find_upstroke = False
+
+        i += 1
 
     # generate the return list
     l_ap = []
