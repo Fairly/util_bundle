@@ -38,6 +38,9 @@ def dt_recognition(data, time_prefix='t'):
     # dt equals the difference of t between 2 consecutive rows
     dt = data[1][i_t] - data[0][i_t]
 
+    if dt > 2:
+        print('Warning! dt > 2 ms.')
+
     return dt
 
 
@@ -118,17 +121,46 @@ def measure(infilename, celltype='n'):
     # noinspection PyTypeChecker
     data = np.genfromtxt(infilename, names=True, delimiter="\t")
     dt = dt_recognition(data)
+    i_t, i_v, i_dvdt, i_ca_i, i_na_i = find_fields(data)
+
+    if i_t is None:
+        print("Cannot find 'time' in the file. "
+              "Are you processing a wrong file?")
+        exit(1)
+    if i_dvdt is None and i_v is None:
+        print("Both 'dvdt' and 'V_m' are not in the file. Cannot calculate dV/dt, exit.")
+        exit(1)
+
+    if i_dvdt is None:
+        print("Warning: no 'dvdt' in the file, calculated by time and V, maybe not accurate.")
+
+        array_dvdt = np.zeros(len(data))
+        old_V = data[0][i_v]
+        new_V = data[1][i_v]
+        dvdt = 0
+
+        for i, row in enumerate(data):
+            if i + 1 > len(data):
+                pass
+            else:
+                dvdt = (new_V - old_V) / dt
+                old_V = new_V
+                if i + 2 < len(data):
+                    new_V = data[i + 2][i_v]
+            array_dvdt[i] = dvdt
+
+        # add a column of 'dvdt' to the data
+        from numpy.lib.recfunctions import append_fields
+        data = append_fields(data, 'dvdt', array_dvdt)
+        i_dvdt = data.dtype.names.index('dvdt')
 
     if celltype == 'n':
         l_ap = ap_recognition(data)
         num_bcl = len(l_ap)
 
         if num_bcl == 0:
-            raise DataError("No APs detected in input.")
-
-        # plot.save_data_file(infilename, header, data[int(-5*1000/dt):])
-
-        # header, data = plot.read_data_file(infilename)
+            print("No APs detected in input.")
+            exit(1)
 
         upstroke_duration = 8
 
@@ -144,8 +176,6 @@ def measure(infilename, celltype='n'):
         for i in range(num_bcl):
             # For each beat
             result[i, 0] = i  # The beat written in file starts from 0
-
-        i_t, i_v, i_dvdt, i_ca_i, i_na_i = find_fields(data, infilename)
 
         tmp = []
         # First loop. Calculate characteristics except APDs
@@ -176,14 +206,16 @@ def measure(infilename, celltype='n'):
                 if row[i_dvdt] > max_dvdt:
                     max_dvdt = row[i_dvdt]
                     max_dvdt_t = row[i_t]
-                if row[i_ca_i] > max_ca_i:
-                    max_ca_i = row[i_ca_i]
-                if row[i_ca_i] < min_ca_i_afterpeak and row[i_t] >= data[beat_start][i_t] + upstroke_duration:
-                    min_ca_i_afterpeak = row[i_ca_i]
-                if row[i_ca_i] < min_ca_i_beforepeak and row[i_t] < data[beat_start][i_t] + upstroke_duration:
-                    min_ca_i_beforepeak = row[i_ca_i]
-                if row[i_na_i] < min_na_i:
-                    min_na_i = row[i_na_i]
+                if i_ca_i is not None:
+                    if row[i_ca_i] > max_ca_i:
+                        max_ca_i = row[i_ca_i]
+                    if row[i_ca_i] < min_ca_i_afterpeak and row[i_t] >= data[beat_start][i_t] + upstroke_duration:
+                        min_ca_i_afterpeak = row[i_ca_i]
+                    if row[i_ca_i] < min_ca_i_beforepeak and row[i_t] < data[beat_start][i_t] + upstroke_duration:
+                        min_ca_i_beforepeak = row[i_ca_i]
+                if i_na_i is not None:
+                    if row[i_na_i] < min_na_i:
+                        min_na_i = row[i_na_i]
 
             amp_ap = max_ap - min_ap_beforepeak
             amp_ca_i = max_ca_i - min_ca_i_beforepeak
@@ -262,11 +294,12 @@ def measure(infilename, celltype='n'):
             # End of a single beat
             result[beat, len(tmp) + 1:] = tau_decay_cai, apd_20, apd_25, apd_30, apd_50, apd_70, apd_75, apd_80, apd_90
     elif celltype == 'p':
-        i_t, i_v, i_dvdt, i_ca_i, i_na_i = find_fields(data, infilename)
+        i_t, i_v, i_dvdt, i_ca_i, i_na_i = find_fields(data)
 
         if i_t is None or i_v is None or i_dvdt is None:
-            raise DataError("Data file is not in right format. "
-                            "Please check there are 't', 'dvdt',and 'V' fields in the file.")
+            print("Data file is not in right format. "
+                  "Please check there are 't', 'dvdt',and 'V' fields in the file.")
+            exit(1)
 
         lowv_found = False
         highv_found = False
@@ -360,7 +393,7 @@ def measure(infilename, celltype='n'):
     print("measurement of %s is done." % infilename)
 
 
-def find_fields(data, infilename):
+def find_fields(data):
     # Find data fields
     time_name = None
     voltage_name = None
@@ -371,7 +404,7 @@ def find_fields(data, infilename):
     for header in data.dtype.names:
         if header.startswith('t'):
             time_name = header
-        elif header.startswith('V_m') or header == 'V':
+        elif 'v_m' == header.lower() or header.lower() == 'v' or 'ap' == header.lower():
             voltage_name = header
         elif 'dvdt' in header.lower():
             dvdt_name = header
