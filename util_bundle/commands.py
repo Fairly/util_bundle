@@ -739,23 +739,32 @@ Arguments:
             yaxis_infiles.append(yaxis_in_single_file)
 
         # plot
+        markers = ['o', 'v', '^', '<', '>', 's', 'p', '*']
+        index_marker = 0
         l_figure = []
         if args['-f']:
             for i, _x in enumerate(xaxis_infiles):
                 l_figure.append(plt.figure())
                 for j, _y in enumerate(yaxis_infiles[i]):
-                    plt.plot(_x, _y, label=legends[j] if legends else None)
+                    plt.plot(_x, _y, marker=markers[index_marker], label=legends[j] if legends else None)
+                    index_marker += 1
         else:
             for i in range(len(yaxis_infiles[0])):
                 l_figure.append(plt.figure())
                 for j, _x in enumerate(xaxis_infiles):
-                    plt.plot(_x, yaxis_infiles[j][i], label=legends[j] if legends else None)
+                    plt.plot(_x, yaxis_infiles[j][i], marker=markers[index_marker], label=legends[j] if legends else None)
+                    index_marker += 1
 
         if args['-L']:
             for _figure in l_figure:
                 axes = _figure.get_axes()
                 for _a in axes:
                     _a.legend()
+
+        # save on my computer
+        if os.path.isdir(r'C:\Users\Shanzhuo Zhang\Downloads'):
+            print(r'Automatically save to C:\Users\Shanzhuo Zhang\Downloads\Fig_1.png')
+            plt.savefig(r'C:\Users\Shanzhuo Zhang\Downloads\Fig_1.png', dpi=300)
         plt.show()
 
 
