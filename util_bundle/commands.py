@@ -86,10 +86,14 @@ Arguments:
             current_files = args['<FILE>']
 
         thread_num = cpu_count() if args['-m'] else 1
-        with ThreadPoolExecutor(thread_num) as executor:
-            future_list = [executor.submit(measurement.measure, f, args['-t']) for f in current_files]
-            for _ in concurrent.futures.as_completed(future_list):
-                continue
+        if thread_num == 1:  # this single thread part is redundant but not removed for easier debugging
+            for f in current_files:
+                measurement.measure(f, args['-t'])
+        else:
+            with ThreadPoolExecutor(thread_num) as executor:
+                future_list = [executor.submit(measurement.measure, f, args['-t']) for f in current_files]
+                for _ in concurrent.futures.as_completed(future_list):
+                    continue
 
 
 def clean_result_for_plot(filename, add_underline=False, truncate_to=None, shrink=None,
