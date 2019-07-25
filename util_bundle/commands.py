@@ -2,7 +2,7 @@ import os
 import shutil
 import sys
 import concurrent.futures
-from concurrent.futures import ThreadPoolExecutor
+from concurrent.futures import ProcessPoolExecutor
 from multiprocessing import cpu_count
 from subprocess import call
 import re
@@ -51,10 +51,13 @@ class AbstractCommand:
 
 class measure(AbstractCommand):
     """
-usage:  measure    [-m] [-t=celltype] (([-s=SUFFIX] -d=DIR) | <FILE>...)
+usage:  measure    [options] [-t=celltype] (([-s=SUFFIX] -d=DIR) | <FILE>...)
 
 Options:
     -m          Open multi-processing.
+    --drop-last
+                In tissue simulation, the last beat may not be complete. If this option is set,
+                the last line will be ignored, no matter complete or not. [default: false]
     -t=celltype
                 Set the cell type you are measuring to 'p' for pacemaker or 'n' for non-pacemaker.
                 [default: n]
@@ -69,6 +72,7 @@ Arguments:
             '-d': Or(None, os.path.isdir),
             '-s': Use(str),
             '-m': bool,
+            '--drop-last': bool,
             '-t': Use(str),
             '<FILE>': Or(None, [os.path.isfile], error='Cannot find file[s].'),
         }
@@ -85,13 +89,14 @@ Arguments:
         else:
             current_files = args['<FILE>']
 
-        thread_num = cpu_count() if args['-m'] else 1
-        if thread_num == 1:  # this single thread part is redundant but not removed for easier debugging
+        process_num = cpu_count()-1 if args['-m'] else 1
+        if process_num == 1:  # this single thread part is redundant but not removed for easier debugging
             for f in current_files:
-                measurement.measure(f, args['-t'])
+                measurement.measure(f, args['-t'], args['--drop-last'])
         else:
-            with ThreadPoolExecutor(thread_num) as executor:
-                future_list = [executor.submit(measurement.measure, f, args['-t']) for f in current_files]
+            with ProcessPoolExecutor(process_num) as executor:
+                future_list = [executor.submit(measurement.measure, f, args['-t'], args['--drop-last'])
+                               for f in current_files]
                 for _ in concurrent.futures.as_completed(future_list):
                     continue
 
@@ -560,9 +565,6 @@ Options:
                 If alternans are in the result files, more than 1 values will be extracted from
                 the result files to plot the bifurcation. This option sort the values to
                 avoid crossings in the output curves. [default: false]
-    --drop-last
-                In tissue simulation, the last beat may not be complete. If this option is set,
-                the last line will be ignored, no matter complete or not. [default: false]
 
 Arguments:
     <FILE>      File names.
@@ -574,7 +576,6 @@ Arguments:
             '-y': str,
             '-m': str,
             '--sort-alternans': bool,
-            '--drop-last': bool,
             '<FILE>': [os.path.isfile],
         })
 
@@ -600,8 +601,9 @@ Arguments:
             print('Processing file: ' + fname)
             _, m = read_data_file(fname)
 
-            if args['--drop-last']:
-                m = m[:-1]
+            if n > len(m):
+                print('Number of rows in datafile is less than the number wanted to be extracted. Exit!')
+                exit(1)
 
             target = os.path.basename(fname)
             target = os.path.splitext(target)[0]
