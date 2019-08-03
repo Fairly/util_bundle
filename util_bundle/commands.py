@@ -660,9 +660,10 @@ An easy plot command for single data files. Unlike `qplot`, this command is desi
 in each file, not extracted data from a series of files.
 
 usage:
-    eplot  [-f] [-e=func] [-L=labels] [-x=xaxis] -y=yaxis <FILE>...
+    eplot  [options] [-e=func] [-L=labels] [-x=xaxis] -y=yaxis <FILE>...
 
 Options:
+    -m          Whether plot markers for data points. [default: false]
     -f          New figure for each file and all `yaxis` in one figure. If not, new figure for each `yaxis`,
                 and the columns named `yaxis` in every file will be on one figure.
     -e=func     A function with two arguments 'a' and 'b' that will be `eval`ed to generate results for plotting.
@@ -681,6 +682,7 @@ Arguments:
     """
     def execute(self):
         schema = Schema({
+            '-m': bool,
             '-f': bool,
             '-e': Or(None, str),
             '-x': Or(Use(int), str),
@@ -741,7 +743,11 @@ Arguments:
             yaxis_infiles.append(yaxis_in_single_file)
 
         # plot
-        markers = ['o', 'v', '^', '<', '>', 's', 'p', '*']
+        if args['-m']:
+            markers = ['o', 'v', '^', '<', '>', 's', 'p', '*'] * 10
+        else:
+            markers = ['', ] * 50
+
         index_marker = 0
         l_figure = []
         if args['-f']:
