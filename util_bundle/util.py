@@ -27,6 +27,11 @@ def read_data_file(filename, max_rows=None):
             l_labels = first_line.split(delimiter)
             l_labels = [_label.strip() for _label in l_labels]
 
+        # only has one data line
+        if npa_data.shape == ():
+            _type = ['<f8'] * len(l_labels)
+            npa_data = np.array([npa_data], dtype=list(zip(l_labels, _type)))
+
         # The number of data fields may exceed the number of headers, remove last several columns
         if len(l_labels) < len(npa_data[0]):
             names = list(npa_data.dtype.names)[:len(l_labels)]
