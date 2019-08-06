@@ -105,7 +105,7 @@ def get_range(beat, dt, l_ap, time_offset=0):
     return beat_start, beat_end
 
 
-def measure(infilename, celltype='n'):
+def measure(infilename, celltype='n', drop_last=False, tissue=False):
     """
     Intend to calculate several values indicating AP characteristics.
 
@@ -156,6 +156,9 @@ def measure(infilename, celltype='n'):
 
     if celltype == 'n':
         l_ap = ap_recognition(data)
+        if drop_last:
+            l_ap = l_ap[:-1]
+
         num_bcl = len(l_ap)
 
         if num_bcl == 0:
@@ -220,8 +223,14 @@ def measure(infilename, celltype='n'):
             amp_ap = max_ap - min_ap_beforepeak
             amp_ca_i = max_ca_i - min_ca_i_beforepeak
 
+            if tissue:
+                min_ca_afterandbefore = min_ca_i_beforepeak if min_ca_i_beforepeak < min_ca_i_afterpeak \
+                    else min_ca_i_afterpeak
+            else:
+                min_ca_afterandbefore = min_ca_i_afterpeak
+
             tmp = [l_ap[beat][0], min_ap_afterpeak, max_ap, amp_ap, max_dvdt, max_dvdt_t,
-                   max_ca_i, min_ca_i_afterpeak, amp_ca_i, min_na_i]
+                   max_ca_i, min_ca_afterandbefore, amp_ca_i, min_na_i]
             result[beat, 1:len(tmp) + 1] = tmp
             # End of a single beat
 

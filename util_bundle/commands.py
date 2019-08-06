@@ -63,6 +63,11 @@ Options:
                 [default: n]
     -d=DIR      Process all files written by cell models under DIR.
     -s=SUFFIX   Set with -d=DIR to specify the suffix of file to be processed. [default: .dat]
+
+    --tissue-CaT-alternans
+                Trigger for a special calculation method for the CaT amplitude. The CaT amplitude
+                calculated as its maximum - minimum. (Normally, it should be maximum - ([Ca]i at
+                the point of activation))
 Arguments:
     <FILE>...   Files to be processed.
     """
@@ -73,6 +78,7 @@ Arguments:
             '-s': Use(str),
             '-m': bool,
             '--drop-last': bool,
+            '--tissue-CaT-alternans': bool,
             '-t': Use(str),
             '<FILE>': Or(None, [os.path.isfile], error='Cannot find file[s].'),
         }
@@ -92,10 +98,11 @@ Arguments:
         process_num = cpu_count()-1 if args['-m'] else 1
         if process_num == 1:  # this single thread part is redundant but not removed for easier debugging
             for f in current_files:
-                measurement.measure(f, args['-t'], args['--drop-last'])
+                measurement.measure(f, args['-t'], args['--drop-last'], args['--tissue-CaT-alternans'])
         else:
             with ProcessPoolExecutor(process_num) as executor:
-                future_list = [executor.submit(measurement.measure, f, args['-t'], args['--drop-last'])
+                future_list = [executor.submit(measurement.measure, f, args['-t'],
+                                               args['--drop-last'], args['--tissue-CaT-alternans'])
                                for f in current_files]
                 for _ in concurrent.futures.as_completed(future_list):
                     continue
