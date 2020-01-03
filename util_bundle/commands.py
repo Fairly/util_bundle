@@ -108,7 +108,7 @@ Arguments:
                     continue
 
 
-def clean_result_for_plot(filename, add_underline=False, truncate_to=None, shrink=None,
+def clean_result_for_plot(filename, add_underline=False, head=None, truncate_to=None, shrink=None,
                           reset_start_time=False, tail=True):  # TODO parameter `tail`
     """
     When plotting a result, it's common to reduce the size of the result file first.
@@ -124,10 +124,29 @@ def clean_result_for_plot(filename, add_underline=False, truncate_to=None, shrin
     shutil.copyfile(filename, backup_file_name)  # backup
     shutil.move(filename, tmp_file_name)
 
+    i = None
+
+    if head is not None:
+        if i is None:
+            f = open(tmp_file_name, 'r')
+            i = len(f.readlines())
+            f.close()
+
+        if head >= i:
+            pass
+        else:
+            # use shell command is usually faster than python itself
+            to_file = open(filename, mode="w")
+            call(['head', '-n', str(head+1), tmp_file_name], stdout=to_file)
+            to_file.close()
+
+            shutil.move(filename, tmp_file_name)
+
     if truncate_to is not None:
-        f = open(tmp_file_name, 'r')
-        i = len(f.readlines())
-        f.close()
+        if i is None:
+            f = open(tmp_file_name, 'r')
+            i = len(f.readlines())
+            f.close()
 
         if truncate_to >= i - 1:  # header in the first line, so minus 1 here
             pass
@@ -493,6 +512,8 @@ Options:
 class clean(AbstractCommand):
     """
 usage: clean rmbackup <DIR>
+       clean concat (<FILE_A> <FILE_B>)...
+       clean concat -B=base_file <FILE_B>...
        clean -R <FILE>...
        clean [options] <FILE>...
 
@@ -500,8 +521,14 @@ Clean the data file. Original file will be backed up.
 
 Commands:
     rmbackup    Recursively remove all backup data files in a given <DIR>.
+    concat      Concatenate two data files. Time will be adjusted.
 
 Options:
+    -B=base_file
+                Set a communal base file to be concatenated by following files.
+    --head=num
+                Whether truncate the result file to the head `num` of rows. If both `--head` and `-t`
+                are specified, `head` first.
     -t=num, --truncate=num
                 Whether truncate the result file to tailing `num` of rows.
     -s=dt, --shrink=dt
@@ -514,6 +541,7 @@ Options:
                 If regret, try this. Recover from backup files.
 Arguments:
     <FILE>...          Files to be processed.
+    <FILE_A> <FILE_B>  Files to be concatenated. Should have same fields.
     <DIR>              A directory.
     """
 
@@ -527,12 +555,17 @@ Arguments:
 
     def execute(self):
         schema = Schema({'rmbackup': bool,
+                         'concat': bool,
+                         '-B': Or(None, os.path.isfile),
                          '--reset-time': Or(None, Use(float)),
+                         '--head': Or(None, Use(int)),
                          '--truncate': Or(None, Use(int)),
                          '--shrink': Or(None, Use(float)),
                          '--underline': bool,
                          '--recover': bool,
-                         '<FILE>': Or(None, list),
+                         '<FILE>': Or(None, [os.path.isfile], error='Cannot find file[s].'),
+                         '<FILE_A>': Or(None, [os.path.isfile], error='Cannot find file[s].'),
+                         '<FILE_B>': Or(None, [os.path.isfile], error='Cannot find file[s].'),
                          '<DIR>': Or(None, os.path.isdir),
                          }
                         )
@@ -545,9 +578,55 @@ Arguments:
                 shutil.move(f, original_file)
         elif args['rmbackup']:
             self.remove_backup(args['<DIR>'])
+        elif args['concat']:
+            if args['-B']:
+                args['<FILE_A>'] = [args['-B']] * len(args['<FILE_B>'])
+
+            for file_a, file_b in zip(args['<FILE_A>'], args['<FILE_B>']):
+                print('Concatenating {} and {}.'.format(file_a, file_b))
+                _header_a, data_a = read_data_file(file_a)
+                _header_b, data_b = read_data_file(file_b)
+
+                # remove not matching fields
+                if len(_header_a) > len(_header_b):
+                    num_diff = len(_header_a) - len(_header_b)
+
+                    from numpy.lib.recfunctions import drop_fields
+                    data_a = drop_fields(data_a, _header_a[len(_header_a)-num_diff:])
+                    _header_a = _header_a[:len(_header_a)-num_diff]
+                elif len(_header_b) > len(_header_a):
+                    num_diff = len(_header_b) - len(_header_a)
+
+                    from numpy.lib.recfunctions import drop_fields
+                    data_b = drop_fields(data_b, _header_b[len(_header_b) - num_diff:])
+                    _header_b = _header_b[:len(_header_b) - num_diff]
+
+                #
+                i_t, _, _, _, _ = measurement.find_fields(data_a)
+                name_of_time = data_a.dtype.names[i_t]
+
+                # adjust time of a
+                if data_a[0][i_t] != 0:
+                    data_a[name_of_time] = data_a[name_of_time] - data_a[0][i_t]
+
+                # adjust time of b
+                end_time_of_a = data_a[-1][i_t]
+                start_time_of_b = data_b[0][i_t]
+                dt_of_b = measurement.dt_recognition(data_b)
+
+                data_b[name_of_time] = data_b[name_of_time] + end_time_of_a + dt_of_b - start_time_of_b
+
+                # concatenate and save
+                data_c = np.concatenate((data_a, data_b))
+
+                infilepath, _infilename = os.path.split(file_b)
+                out_file_name = 'concat_' + _infilename
+                out_file_name = os.path.join(infilepath, out_file_name)
+                save_data_file(out_file_name, data_b.dtype.names, data_c)
         else:
             for f in args['<FILE>']:
                 clean_result_for_plot(f, add_underline=args['--underline'],
+                                      head=args['--head'],
                                       truncate_to=args['--truncate'],
                                       shrink=args['--shrink'],
                                       reset_start_time=args['--reset-time'])
@@ -616,6 +695,7 @@ Arguments:
             target = os.path.splitext(target)[0]
             target = target.split('_')[args['-s']]
             xaxis = target[target.find('-') + 1:]
+            if ',' in xaxis: xaxis = xaxis.replace(',', '.')
             xaxis = float(xaxis)
 
             y_result = []
@@ -652,6 +732,9 @@ Arguments:
             for _y_name in yaxis_name:
                 for i in range(n):
                     new_yaxis.append(_y_name + '_' + str(i))
+        else:
+            new_yaxis = yaxis_name
+
 
         result.sort()
         if args['-y'] == 'ALL':
