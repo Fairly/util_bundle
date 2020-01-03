@@ -10,6 +10,8 @@ Command:
   datareduce    A quick method reducing data from various data files.
   align         Align data in results for reasonable comparison.
   measure       Calculate characteristics of APs from results of cell models.
+  integrate     Calculate the accumulation of fields in the results of cell models.
+  cal_dvdt      Calculate the dV/dt for a result file.
 
   eplot         Very easy plot with limited functionality.
   qplot         Plot AP or current traces by a simple script.

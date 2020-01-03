@@ -216,6 +216,134 @@ def clean_result_for_plot(filename, add_underline=False, head=None, truncate_to=
     print('Done!')
 
 
+class integrate(AbstractCommand):
+    """
+usage:  integrate    [options] (([-s=SUFFIX] -d=DIR) | <FILE>...)
+
+Options:
+    -b          Only retain the final value of each beats. One-point-per-beat mode.
+
+    -d=DIR      Process all files written by cell models under DIR.
+    -s=SUFFIX   Set with -d=DIR to specify the suffix of file to be processed. [default: .dat]
+
+Arguments:
+    <FILE>...   Files to be processed.
+    """
+
+    def execute(self):
+        schema = Schema({
+            '-b': bool,
+            '-d': Or(None, os.path.isdir),
+            '-s': Use(str),
+            '<FILE>': Or(None, [os.path.isfile], error='Cannot find file[s].'),
+        }
+        )
+
+        args = schema.validate(self.args)
+
+        if args['-d']:
+            # given a directory, measure all files in it
+            onlyfiles = [os.path.join(args['-d'], f)
+                         for f in os.listdir(args['-d'])
+                         if os.path.isfile(os.path.join(args['-d'], f))]
+            current_files = [f for f in onlyfiles if f.endswith(args['-s'])]
+        else:
+            current_files = args['<FILE>']
+
+        for f in current_files:
+            print('Processing ' + f)
+            header, data = read_data_file(f)
+
+            dt = measurement.dt_recognition(data)
+            i_t, i_v, i_dvdt, i_ca_i, i_na_i = measurement.find_fields(data)
+            if i_dvdt is None:
+                data, i_dvdt = measurement.calculate_dvdt(data, dt, i_v)
+            l_ap = measurement.ap_recognition(data)
+            num_bcl = len(l_ap)
+
+            # integrate every field
+            for _header in header[2:]:
+                for i, _r in enumerate(data[_header][1:]):
+                    data[_header][i + 1] = data[_header][i] + data[_header][i + 1]
+
+            for beat in range(0, num_bcl):
+                beat_start, beat_end = measurement.get_range(beat, dt, l_ap, data[0][i_t])
+                for _header in header[2:]:
+                    data[_header][beat_start:beat_end] = data[_header][beat_start:beat_end] - data[_header][beat_start]
+
+            # times dt for all data fields
+            dt = measurement.dt_recognition(data)
+            for _header in header[2:]:
+                data[_header][:] = data[_header][:] * dt
+
+            # todo unknown bug, has to delete three wrong lines at the end of the result
+            data = data[:-3]
+            if args['-b']:      # one point per beat mode
+                new_data = np.ndarray((num_bcl, ), dtype=data.dtype)
+                for beat in range(0, num_bcl):
+                    beat_start, beat_end = measurement.get_range(beat, dt, l_ap, data[0][i_t])
+                    if beat == num_bcl - 1:     # todo same as previous todo, to avoid over bound
+                        beat_end = beat_end - 3
+                    new_data[beat] = data[beat_end-1]
+                    new_data[beat][0] = beat
+
+                from numpy.lib import recfunctions as rfn
+                new_data = rfn.rename_fields(new_data, {'t': 'beat'})
+                data = None
+                data = new_data
+
+            # output
+            infilepath, _infilename = os.path.split(f)
+            out_file_name = 'integral_' + _infilename
+            out_file_name = os.path.join(infilepath, out_file_name)
+            save_data_file(out_file_name, data.dtype.names, data)
+
+
+class cal_dvdt(AbstractCommand):
+    """
+The new column of dV/dt will be added to the file as the last column.
+
+usage:  cal_dvdt    [options] (([-s=SUFFIX] -d=DIR) | <FILE>...)
+
+Options:
+    -d=DIR      Process all files written by cell models under DIR.
+    -s=SUFFIX   Set with -d=DIR to specify the suffix of file to be processed. [default: .dat]
+
+Arguments:
+    <FILE>...   Files to be processed.
+    """
+
+    def execute(self):
+        schema = Schema({
+            '-d': Or(None, os.path.isdir),
+            '-s': Use(str),
+            '<FILE>': Or(None, [os.path.isfile], error='Cannot find file[s].'),
+        }
+        )
+
+        args = schema.validate(self.args)
+
+        if args['-d']:
+            # given a directory, measure all files in it
+            onlyfiles = [os.path.join(args['-d'], f)
+                         for f in os.listdir(args['-d'])
+                         if os.path.isfile(os.path.join(args['-d'], f))]
+            current_files = [f for f in onlyfiles if f.endswith(args['-s'])]
+        else:
+            current_files = args['<FILE>']
+
+        for f in current_files:
+            print('Processing ' + f)
+            header, data = read_data_file(f)
+
+            dt = measurement.dt_recognition(data)
+            i_t, i_v, i_dvdt, i_ca_i, i_na_i = measurement.find_fields(data)
+            if i_dvdt is None:
+                data, i_dvdt = measurement.calculate_dvdt(data, dt, i_v)
+
+                save_data_file(f, data.dtype.names, data)
+
+
 class equa(AbstractCommand):
     """
 usage: equa [options] <FILE>...
@@ -1054,7 +1182,7 @@ Examples:
     0.3     50
     ...     ...
 
-    If run `vclean -s 1 -y I_Na result*` ('*' is the wildcard, supported on both Linux
+    If run `vclean -s 1 -t I_Na result*` ('*' is the wildcard, supported on both Linux
     and Win), the resultant file will be:
 
     t       BCL-100     BCL-1000
@@ -1102,7 +1230,7 @@ Examples:
             targets = args['-t'].split(',')
 
         import plotvc as pvc
-        pvc.vclean(l_files, targets, xaxis=args['-s'], start=args['<START>'], end=args['<END>'])
+        pvc.vclean_tmp(l_files, targets, xaxis=args['-s'], start=args['<START>'], end=args['<END>'])
 
 
 class burst(AbstractCommand):

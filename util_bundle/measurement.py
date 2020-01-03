@@ -59,11 +59,15 @@ def ap_recognition(data):
     jump_time = 5  # [ms]
     jump_step = int(jump_time/dt)   # jump over a short time to avoid local maximum in rare cases
 
+    if i_dvdt is None:
+        data, i_dvdt = calculate_dvdt(data, dt, i_v)
+
     # find all stimuli
     if_find_upstroke = False
     i = 0
     while i < len(data):
         row = data[i]
+
         if if_find_upstroke is False and row[i_dvdt] > 5:
             # spot a upstroke
             if_find_upstroke = True
@@ -132,27 +136,7 @@ def measure(infilename, celltype='n', drop_last=False, tissue=False):
         exit(1)
 
     if i_dvdt is None:
-        print("Warning: no 'dvdt' in the file, calculated by time and V, maybe not accurate.")
-
-        array_dvdt = np.zeros(len(data))
-        old_V = data[0][i_v]
-        new_V = data[1][i_v]
-        dvdt = 0
-
-        for i, row in enumerate(data):
-            if i + 1 > len(data):
-                pass
-            else:
-                dvdt = (new_V - old_V) / dt
-                old_V = new_V
-                if i + 2 < len(data):
-                    new_V = data[i + 2][i_v]
-            array_dvdt[i] = dvdt
-
-        # add a column of 'dvdt' to the data
-        from numpy.lib.recfunctions import append_fields
-        data = append_fields(data, 'dvdt', array_dvdt)
-        i_dvdt = data.dtype.names.index('dvdt')
+        data, i_dvdt = calculate_dvdt(data, dt, i_v)
 
     if celltype == 'n':
         l_ap = ap_recognition(data)
@@ -169,7 +153,7 @@ def measure(infilename, celltype='n', drop_last=False, tissue=False):
 
         # Calculation starts here
         result_header_list = ["Beat", "Stim_t", "AP_Min", "AP_Max", "AP_Amp",
-                              "dVdt_Max", "dVdt_Max_t",  # maximum dVdt and the time of it
+                              "dVdt_Max", "dVdt_Max_t",  "I_CaL_Max",  # maximum dVdt and the time of it
                               "Ca_i_Max", "Ca_i_Dia", "Ca_i_Amp",
                               "Na_i_Dia", "Ca_i_tau",
                               "APD20", "APD_25", "APD_30", "APD_50", "APD_70", "APD_75", "APD_80", "APD_90"]
@@ -192,6 +176,7 @@ def measure(infilename, celltype='n', drop_last=False, tissue=False):
             max_ap = -1000
             max_dvdt = -1000
             max_dvdt_t = -1000
+            max_ICaL = 0
             max_ca_i = -1000
             min_ca_i_beforepeak = 1000
             min_ca_i_afterpeak = 1000
@@ -209,6 +194,9 @@ def measure(infilename, celltype='n', drop_last=False, tissue=False):
                 if row[i_dvdt] > max_dvdt:
                     max_dvdt = row[i_dvdt]
                     max_dvdt_t = row[i_t]
+                if row['I_CaL'] and abs(row['I_CaL']) > abs(max_ICaL):
+                    max_ICaL = row['I_CaL']
+
                 if i_ca_i is not None:
                     if row[i_ca_i] > max_ca_i:
                         max_ca_i = row[i_ca_i]
@@ -226,10 +214,11 @@ def measure(infilename, celltype='n', drop_last=False, tissue=False):
             if tissue:
                 min_ca_afterandbefore = min_ca_i_beforepeak if min_ca_i_beforepeak < min_ca_i_afterpeak \
                     else min_ca_i_afterpeak
+                amp_ca_i = max_ca_i - min_ca_afterandbefore
             else:
                 min_ca_afterandbefore = min_ca_i_afterpeak
 
-            tmp = [l_ap[beat][0], min_ap_afterpeak, max_ap, amp_ap, max_dvdt, max_dvdt_t,
+            tmp = [l_ap[beat][0], min_ap_afterpeak, max_ap, amp_ap, max_dvdt, max_dvdt_t, max_ICaL,
                    max_ca_i, min_ca_afterandbefore, amp_ca_i, min_na_i]
             result[beat, 1:len(tmp) + 1] = tmp
             # End of a single beat
@@ -402,6 +391,32 @@ def measure(infilename, celltype='n', drop_last=False, tissue=False):
     print("measurement of %s is done." % infilename)
 
 
+def calculate_dvdt(data, dt, i_v):
+    print("Warning: no 'dvdt' in the file, calculated by time and V, maybe not accurate.")
+    if i_v is None:
+        print('Error: No V_m in the result file. Cannot calculate dvdt.')
+        exit(1)
+
+    array_dvdt = np.zeros(len(data))
+    old_V = data[0][i_v]
+    new_V = data[1][i_v]
+    dvdt = 0
+    for i, row in enumerate(data):
+        if i + 1 > len(data):
+            pass
+        else:
+            dvdt = (new_V - old_V) / dt
+            old_V = new_V
+            if i + 2 < len(data):
+                new_V = data[i + 2][i_v]
+        array_dvdt[i] = dvdt
+    # add a column of 'dvdt' to the data
+    from numpy.lib.recfunctions import append_fields
+    data = append_fields(data, 'dvdt', array_dvdt)
+    i_dvdt = data.dtype.names.index('dvdt')
+    return data, i_dvdt
+
+
 def find_fields(data):
     # Find data fields
     time_name = None
@@ -411,7 +426,7 @@ def find_fields(data):
     na_myo_name = None
 
     for header in data.dtype.names:
-        if header.startswith('t'):
+        if header.lower() == 't' or header.lower() == 'time':
             time_name = header
         elif 'v_m' == header.lower() or header.lower() == 'v' or 'ap' == header.lower():
             voltage_name = header
