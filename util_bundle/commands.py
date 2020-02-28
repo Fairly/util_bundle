@@ -762,13 +762,19 @@ Arguments:
 
 class datareduce(AbstractCommand):
     """
-usage: datareduce [-s=num] [-y=yaxis] [-m=mode] [options] <FILE>...
+usage: datareduce [-s=num] [-x=xaxis] [-y=yaxis] [-m=mode] [options] <FILE>...
 
 Options:
     -s=num      An integer define which part will be extracted from the file name
                 as the data labels. For example, if file name is 'result_s1s2-25.dat',
                 and this parameter is set to 1, 's1s2-25' will be extracted and used
                 as the first column in the output. [default: 1]
+    -x=xaxis    's' (for string) or 'nv' (for name-value). A character specifying the type of xaxis.
+                If set to 's', the first column of the output file will be named 'Name' and
+                the label extracted from each file name will be directly used as the
+                x-axis label of the file (this mode is usually for plotting bars). Else
+                the label will be treated as a name-value pair (usually for plotting
+                frequency-dependent curves). [default: nv]
     -y=yaxis    A ',' separate string specifying the column(s) used for the y-axis.
                 'ALL' means reduce all columns. [default: ALL]
     -m=mode     Mode can be `t` for tail, `l` for largest, or `s` for smallest. This
@@ -787,6 +793,7 @@ Arguments:
     def execute(self):
         schema = Schema({
             '-s': Use(int),
+            '-x': str,
             '-y': str,
             '-m': str,
             '--sort-alternans': bool,
@@ -795,37 +802,50 @@ Arguments:
 
         args = schema.validate(self.args)
 
-        first_filename = args['<FILE>'][0]
-        path, name = os.path.split(first_filename)
-        target = name.split('_')[args['-s']]
-        xaxis_name = target[:target.find('-')]
-
         # number of values extracted
         n = 1
         if len(args['-m']) > 1:
             n = int(args['-m'][1:])
 
+        # check the mode of x-axis and determine the name of the first column in output
+        if args['-x'] == 's':
+            xaxis_name = 'Name'
+        else:
+            first_filename = args['<FILE>'][0]
+            path, name = os.path.split(first_filename)
+            target = name.split('_')[args['-s']]
+            xaxis_name = target[:target.find('-')]
+
+        # find the names of y-axis
         if args['-y'] == 'ALL':
+            first_filename = args['<FILE>'][0]
             yaxis_name, _ = read_data_file(first_filename)
         else:
             yaxis_name = args['-y'].split(',')
 
+        # construct result file
         result = []
         for fname in args['<FILE>']:
             print('Processing file: ' + fname)
             _, m = read_data_file(fname)
 
             if n > len(m):
-                print('Number of rows in datafile is less than the number wanted to be extracted. Exit!')
+                print('Number of rows in datafile is less than the number of values '
+                      'wanted to be extracted. Exit!')
                 exit(1)
 
+            # extract the value of x-axis
             target = os.path.basename(fname)
             target = os.path.splitext(target)[0]
             target = target.split('_')[args['-s']]
-            xaxis = target[target.find('-') + 1:]
-            if ',' in xaxis: xaxis = xaxis.replace(',', '.')
-            xaxis = float(xaxis)
+            if args['-x'] == 's':
+                xaxis_value = target
+            else:
+                xaxis_value = target[target.find('-') + 1:]
+                if ',' in xaxis_value: xaxis_value = xaxis_value.replace(',', '.')
+                xaxis_value = float(xaxis_value)
 
+            # extract the value of y-axis
             y_result = []
             sort_flag = args['--sort-alternans']
             import heapq        # using heap sort for nth-largest and nth-smallest
@@ -852,7 +872,7 @@ Arguments:
                 else:
                     print('Unsupported mode "' + args['-m'] + '". Exit.', file=sys.stderr)
 
-            result.append([xaxis, *y_result])
+            result.append([xaxis_value, *y_result])
 
         # duplicate yaxis names if more than 1 value extracted
         new_yaxis = []
@@ -863,13 +883,19 @@ Arguments:
         else:
             new_yaxis = yaxis_name
 
-
+        # output
         result.sort()
         if args['-y'] == 'ALL':
-            outfilename = os.path.join(path, 'datareduce_ALL.dat')
+            outfilename = 'datareduce_ALL.dat'
         else:
-            outfilename = os.path.join(path, 'datareduce_' + xaxis_name + '-' + '+'.join(yaxis_name) + '.dat')
-        save_data_file(outfilename, [xaxis_name, *new_yaxis], result)
+            outfilename = os.path.join('datareduce_' + xaxis_name + '-' + '+'.join(yaxis_name) + '.dat')
+        import pandas as pd
+        df = pd.DataFrame(result)
+        df.to_csv(outfilename, sep='\t', header=[xaxis_name, *new_yaxis], index=False, float_format='%.7g')
+        # if is in 's' mode for bar plotting, transpose the result to accommodate Veusz
+        if args['-x'] == 's':
+            df = pd.read_csv(outfilename, sep='\t').transpose()
+            df.to_csv(outfilename, sep='\t', float_format='%.7g', header=False)
 
 
 class eplot(AbstractCommand):
